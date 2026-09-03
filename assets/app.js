@@ -169,7 +169,8 @@ function pill(texto, clase) {
 /* -- Almacén --------------------------------------------------- */
 
 var VACIO = { v: 1, clientes: [], contactos: [], expedientes: [], tareas: [], llamadas: [],
-              facturas: [], documentos: [], objetivos: [], notas: [], enlaces: [],
+              facturas: [], documentos: [], objetivos: [], campanas: [], correos: [],
+              plantillas: [],
               precios: {}, actividad: [], equipo: EQUIPO_INICIAL.slice(), yo: 'carlos' };
 var datos = cargar();
 
@@ -189,7 +190,7 @@ function normaliza(d) {
   var base = JSON.parse(JSON.stringify(VACIO));
   if (!d || typeof d !== 'object') return base;
   ['clientes', 'contactos', 'expedientes', 'tareas', 'llamadas', 'actividad',
-   'facturas', 'documentos', 'objetivos', 'notas', 'enlaces'].forEach(function (k) {
+   'facturas', 'documentos', 'objetivos', 'campanas', 'correos', 'plantillas'].forEach(function (k) {
     if (Array.isArray(d[k])) base[k] = d[k].filter(function (x) { return x && typeof x === 'object'; });
   });
   if (d.precios && typeof d.precios === 'object') base.precios = d.precios;
@@ -222,8 +223,12 @@ function normaliza(d) {
     if (!busca_en(EST_DOC, dc.estado)) dc.estado = 'pedido';
   });
   base.objetivos.forEach(function (o) { if (!o.id) o.id = id(); o.meta = Number(o.meta) || 0; });
-  base.notas.forEach(function (n) { if (!n.id) n.id = id(); });
-  base.enlaces.forEach(function (e) { if (!e.id) e.id = id(); });
+  base.campanas.forEach(function (c) {
+    if (!c.id) c.id = id();
+    c.gasto = Number(c.gasto) || 0;
+  });
+  base.correos.forEach(function (c) { if (!c.id) c.id = id(); });
+  base.plantillas.forEach(function (p) { if (!p.id) p.id = id(); });
   return base;
 }
 
@@ -249,20 +254,30 @@ function tarea(x) { return busca_en(datos.tareas, x); }
 function llamada(x) { return busca_en(datos.llamadas, x); }
 function factura(x) { return busca_en(datos.facturas, x); }
 function documento(x) { return busca_en(datos.documentos, x); }
-function nota(x) { return busca_en(datos.notas, x); }
-function enlace(x) { return busca_en(datos.enlaces, x); }
+function campana(x) { return busca_en(datos.campanas, x); }
+function correo(x) { return busca_en(datos.correos, x); }
+function plantilla(x) { return busca_en(datos.plantillas, x); }
+function nombreCampana(x) { var c = campana(x); return c ? c.nombre : ''; }
 
-/* Solo se aceptan http y https. Un enlace con javascript: o data: seria
-   una puerta abierta dentro de la propia herramienta. */
-function urlSegura(u) {
-  var s = String(u || '').trim();
-  if (!s) return '';
-  if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
-  try {
-    var x = new URL(s);
-    return (x.protocol === 'http:' || x.protocol === 'https:') ? x.href : '';
-  } catch (e) { return ''; }
+/* Lo que ha traido una campana sale de los clientes que la citan, no de
+   un numero que alguien teclea aparte. */
+function rendimiento(c) {
+  var leads = datos.clientes.filter(function (x) { return x.campanaId === c.id; });
+  var ganados = leads.filter(function (x) { return x.estado === 'ganado'; });
+  var consts = datos.expedientes.filter(function (e) {
+    var cl = cliente(e.clienteId);
+    return e.fase === 'const' && cl && cl.campanaId === c.id;
+  });
+  var ingreso = consts.reduce(function (s, e) { return s + (Number(e.importe) || 0); }, 0);
+  var g = Number(c.gasto) || 0;
+  return {
+    leads: leads.length, ganados: ganados.length, consts: consts.length, ingreso: ingreso,
+    cpl: leads.length ? g / leads.length : 0,
+    cpa: consts.length ? g / consts.length : 0,
+    roi: g ? (ingreso - g) / g : 0
+  };
 }
+
 function cobro(x) { return busca_en(COBROS, x) || COBROS[0]; }
 function estDoc(x) { return busca_en(EST_DOC, x) || EST_DOC[0]; }
 function tipoDoc(x) { var d = busca_en(DOCS, x); return d ? d.n : (x || 'Documento'); }
@@ -304,10 +319,10 @@ function aviso(texto, accion, alPulsar) {
 
 var VISTAS = ['panel', 'clientes', 'contactos', 'expedientes', 'paises', 'calculadora',
               'facturacion', 'tareas', 'calendario', 'llamadas', 'objetivos', 'informes',
-              'documentos', 'canales', 'usuarios', 'notas', 'enlaces', 'actividad', 'ajustes'];
+              'correos', 'documentos', 'campanas', 'usuarios', 'actividad', 'ajustes'];
 var vistaActual = 'panel';
 var filtro = { clientes: 'todos', expedientes: 'todos', tareas: 'pendientes',
-               facturacion: 'todas', documentos: 'pendientes' };
+               facturacion: 'todas', documentos: 'pendientes', correos: 'plantillas' };
 var texto = { clientes: '', contactos: '', expedientes: '' };
 var calMes = null;
 
@@ -336,8 +351,8 @@ function pinta() {
     panel: vPanel, clientes: vClientes, contactos: vContactos, expedientes: vExpedientes,
     paises: vPaises, calculadora: vCalculadora, facturacion: vFacturacion, tareas: vTareas,
     calendario: vCalendario, llamadas: vLlamadas, objetivos: vObjetivos,
-    documentos: vDocumentos, canales: vCanales, usuarios: vUsuarios, informes: vInformes,
-    notas: vNotas, enlaces: vEnlaces, actividad: vActividad, ajustes: vAjustes
+    documentos: vDocumentos, campanas: vCampanas, usuarios: vUsuarios, informes: vInformes,
+    correos: vCorreos, actividad: vActividad, ajustes: vAjustes
   };
   $('#vistas').innerHTML = (mapa[vistaActual] || vPanel)();
   contadores();
@@ -359,8 +374,8 @@ function contadores() {
   }));
   pon('documentos', docsPendientes().length, datos.documentos.some(function (dc) { return dc.estado === 'rechazado'; }));
   pon('usuarios', datos.equipo.length);
-  pon('notas', datos.notas.filter(function (n) { return !n.hecha; }).length);
-  pon('enlaces', datos.enlaces.length);
+  pon('campanas', datos.campanas.filter(function (c) { return c.activa !== false; }).length);
+  pon('correos', datos.plantillas.length);
   var av = vencidas().length;
   $('#avisosN').textContent = av > 99 ? '99+' : String(av);
   var y = yo();
@@ -899,7 +914,16 @@ function vAjustes() {
       '<button class="btn btn-linea btn-sm" data-csv="contactos">Contactos</button>' +
       '<button class="btn btn-linea btn-sm" data-csv="expedientes">Expedientes</button>' +
       '<button class="btn btn-linea btn-sm" data-csv="tareas">Tareas</button>' +
-      '<button class="btn btn-linea btn-sm" data-csv="llamadas">Llamadas</button></div></div>' +
+      '<button class="btn btn-linea btn-sm" data-csv="llamadas">Llamadas</button>' +
+      '<button class="btn btn-linea btn-sm" data-csv="campanas">Campañas</button>' +
+      '<button class="btn btn-linea btn-sm" data-csv="informe">Informe mensual</button></div></div>' +
+
+  '<div class="aj"><h2 class="aj-t">Importar clientes</h2>' +
+    '<p class="aj-p">Un CSV con una columna <code>Nombre</code> como m\u00ednimo. Reconoce tambi\u00e9n ' +
+    '<code>Empresa</code>, <code>Correo</code>, <code>Tel\u00e9fono</code> y <code>Origen</code>. ' +
+    'Los que ya existan por nombre se saltan: no se duplica nadie.</p>' +
+    '<div class="aj-acc"><button class="btn btn-linea btn-sm" id="impCsv">Elegir fichero CSV</button>' +
+    '<input type="file" id="ficheroCsv" accept=".csv,text/csv" hidden></div></div>' +
 
   '<div class="aj"><h2 class="aj-t">Quién puede entrar</h2>' +
     '<p class="aj-p">' + window.Acceso.cuantos() + ' de ' + datos.equipo.length + ' personas tienen acceso. ' +
@@ -1240,74 +1264,11 @@ function informeMes(mes) {
 
 /* -- Notas ----------------------------------------------------- */
 
-var I_NOTA = '<svg viewBox="0 0 24 24"><path d="M4 5.4A1.4 1.4 0 0 1 5.4 4h13.2A1.4 1.4 0 0 1 20 5.4v10L15 20H5.4A1.4 1.4 0 0 1 4 18.6Z"/><path d="M20 15h-3.6a1.4 1.4 0 0 0-1.4 1.4V20"/><path d="M7.6 8.6h8.8M7.6 12h5.4"/></svg>';
 
-function vNotas() {
-  var h = '<div class="vista">' + cab('Notas', 'La pizarra del equipo: lo que hay que recordar y no es una tarea',
-    '<button class="btn btn-tinta btn-sm" data-nuevo="nota">' + I_MAS + '<span>Nueva nota</span></button>');
-
-  if (!datos.notas.length) {
-    return h + vacio(I_NOTA, 'La pizarra está limpia',
-      'Para lo que no cabe en una ficha ni tiene fecha: un criterio acordado, un aviso del registro de un país, algo que hay que revisar cuando toque.',
-      '<button class="btn btn-tinta" data-nuevo="nota">' + I_MAS + '<span>Nueva nota</span></button>') + '</div>';
-  }
-
-  var lista = datos.notas.slice().sort(function (a, b) {
-    if (!!a.hecha !== !!b.hecha) return a.hecha ? 1 : -1;
-    return String(b.creado || '').localeCompare(String(a.creado || ''));
-  });
-
-  h += '<div class="tabla">' + lista.map(function (n) {
-    return '<div class="fila' + (n.hecha ? ' hecha' : '') + '">' +
-      '<button class="marcar" data-nota-hecha="' + esc(n.id) + '" aria-pressed="' + (n.hecha ? 'true' : 'false') +
-        '" aria-label="Marcar como resuelta"><svg viewBox="0 0 16 16"><path d="m3 8.5 3.2 3.2L13 5"/></svg></button>' +
-      '<button class="fila-c" data-ficha="nota" data-id="' + esc(n.id) + '">' +
-        '<span class="fila-t">' + esc(n.titulo) + '</span>' +
-        '<span class="fila-s">' + esc(nombrePersona(n.quien) || '') +
-        (n.creado ? ' &middot; ' + esc(fechaCorta(n.creado)) : '') + '</span></button>' +
-      (n.etiqueta ? pill(n.etiqueta) : '') + '</div>';
-  }).join('') + '</div></div>';
-  return h;
-}
 
 /* -- Enlaces --------------------------------------------------- */
 
-var I_ENL = '<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 6 .5l2.5-2.5a4 4 0 0 0-5.7-5.7L11.5 7.6"/><path d="M14 10a4 4 0 0 0-6-.5L5.5 12a4 4 0 0 0 5.7 5.7l1.3-1.3"/></svg>';
 
-function vEnlaces() {
-  var h = '<div class="vista">' + cab('Enlaces', 'Los sitios a los que entra el equipo todos los días',
-    '<button class="btn btn-tinta btn-sm" data-nuevo="enlace">' + I_MAS + '<span>Nuevo enlace</span></button>');
-
-  if (!datos.enlaces.length) {
-    return h + vacio(I_ENL, 'Ningún enlace guardado',
-      'Registros mercantiles, formularios de cada país, la carpeta de plantillas. Lo que ahora está en un marcador de alguien y nadie más encuentra.',
-      '<button class="btn btn-tinta" data-nuevo="enlace">' + I_MAS + '<span>Nuevo enlace</span></button>') + '</div>';
-  }
-
-  var grupos = {};
-  datos.enlaces.forEach(function (e) {
-    var g = e.grupo || 'General';
-    (grupos[g] = grupos[g] || []).push(e);
-  });
-
-  Object.keys(grupos).sort().forEach(function (g) {
-    h += '<p class="bloque-t" style="margin:22px 0 10px">' + esc(g) + '</p><div class="paises">';
-    h += grupos[g].map(function (e) {
-      var u = urlSegura(e.url);
-      var host = '';
-      try { host = u ? new URL(u).hostname.replace(/^www\./, '') : ''; } catch (x) {}
-      return '<div class="pais">' +
-        '<div class="pais-cab"><span class="pais-n">' + esc(e.nombre) + '</span>' +
-        '<button class="btn btn-plano btn-sm" data-editar="enlace" data-id="' + esc(e.id) + '">Editar</button></div>' +
-        (e.nota ? '<p class="pais-d" style="margin:0 0 12px">' + esc(e.nota) + '</p>' : '') +
-        (u ? '<a class="btn btn-suave btn-sm" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' +
-             esc(host || 'Abrir') + '</a>'
-           : '<p class="pista">Sin dirección válida</p>') +
-      '</div>';
-    }).join('') + '</div>';
-  });
-  return h + '</div>';
-}
 
 /* -- Actividad ------------------------------------------------- */
 
@@ -1337,16 +1298,249 @@ function vActividad() {
   return h + '</div>';
 }
 
-function fNota(x) {
-  var n = nota(x);
-  if (!n) return '';
-  var h = cabFicha(n.titulo, esc((nombrePersona(n.quien) || '') + (n.creado ? ' · ' + fechaCorta(n.creado) : '')));
-  h += '<div class="cajon-cuerpo">';
-  if (n.etiqueta) h += '<div class="bloque"><p class="bloque-t">Etiqueta</p>' + pill(n.etiqueta) + '</div>';
-  if (n.texto) h += '<div class="bloque"><p class="bloque-t">Nota</p><p class="nota">' + esc(n.texto) + '</p></div>';
+
+/* -- Campañas -------------------------------------------------- */
+
+var PLATAFORMAS = ['Google Ads', 'Meta', 'LinkedIn', 'TikTok', 'Bing', 'Otra'];
+var I_CAM = '<svg viewBox="0 0 24 24"><path d="M4 19.5V11M9.3 19.5V5M14.7 19.5v-9M20 19.5V13"/></svg>';
+
+function vCampanas() {
+  var h = '<div class="vista">' + cab('Campañas', 'Lo que cuesta cada anuncio y lo que trae de verdad',
+    '<button class="btn btn-tinta btn-sm" data-nuevo="campana">' + I_MAS + '<span>Nueva campaña</span></button>');
+
+  if (!datos.campanas.length) {
+    return h + vacio(I_CAM, 'Ninguna campaña',
+      'Apunta cada campaña con su gasto. El coste por lead y por constitución salen solos de los clientes que la citan: no hay que llevar la cuenta aparte.',
+      '<button class="btn btn-tinta" data-nuevo="campana">' + I_MAS + '<span>Nueva campaña</span></button>') + '</div>';
+  }
+
+  var gasto = datos.campanas.reduce(function (s, c) { return s + (Number(c.gasto) || 0); }, 0);
+  var leads = datos.clientes.filter(function (c) { return !!c.campanaId; }).length;
+  var consts = datos.campanas.reduce(function (s, c) { return s + rendimiento(c).consts; }, 0);
+  var ingreso = datos.campanas.reduce(function (s, c) { return s + rendimiento(c).ingreso; }, 0);
+
+  h += '<div class="kpis">' +
+    kpi(I_CAM, 'Invertido', euros(gasto), datos.campanas.length + (datos.campanas.length === 1 ? ' campaña' : ' campañas')) +
+    kpi(I_CLIENTE, 'Leads traídos', String(leads), leads ? esc(euros(gasto / leads)) + ' por lead' : '—') +
+    kpi(I_EXP, 'Constituciones', String(consts), consts ? esc(euros(gasto / consts)) + ' por constitución' : 'ninguna todavía') +
+    kpi(I_FACT, 'Devuelto', euros(ingreso),
+        gasto ? (ingreso >= gasto
+          ? '<b>×' + (ingreso / gasto).toFixed(1) + '</b> lo invertido'
+          : '<b class="baja">' + Math.round(ingreso / gasto * 100) + '%</b> de lo invertido') : '—') +
+  '</div>';
+
+  h += '<div class="tabla"><div class="tabla-desb"><table><thead><tr>' +
+    '<th>Campaña</th><th>Plataforma</th><th class="td-num">Gasto</th><th class="td-num">Leads</th>' +
+    '<th class="td-num">Por lead</th><th class="td-num">Constituidas</th><th class="td-num">Por constitución</th>' +
+    '<th class="td-num">Devuelto</th></tr></thead><tbody>';
+
+  datos.campanas.slice().sort(function (a, b) {
+    return rendimiento(b).consts - rendimiento(a).consts || (Number(b.gasto) || 0) - (Number(a.gasto) || 0);
+  }).forEach(function (c) {
+    var r = rendimiento(c);
+    h += '<tr data-ficha="campana" data-id="' + esc(c.id) + '">' +
+      '<td><div class="cel-txt"><div class="td-p">' + esc(c.nombre) +
+        (c.activa === false ? ' ' + pill('parada') : '') + '</div>' +
+        (c.desde ? '<div class="td-s">desde ' + esc(fechaCorta(c.desde)) + '</div>' : '') + '</div></td>' +
+      '<td class="td-t">' + esc(c.plataforma || '—') + '</td>' +
+      '<td class="td-num">' + esc(euros(c.gasto)) + '</td>' +
+      '<td class="td-num">' + r.leads + '</td>' +
+      '<td class="td-num">' + esc(r.cpl ? euros(r.cpl) : '—') + '</td>' +
+      '<td class="td-num">' + r.consts + '</td>' +
+      '<td class="td-num">' + esc(r.cpa ? euros(r.cpa) : '—') + '</td>' +
+      '<td class="td-num">' + (r.ingreso
+        ? pill(euros(r.ingreso), r.ingreso >= (Number(c.gasto) || 0) ? 'p-ve' : 'p-ro') : '—') + '</td></tr>';
+  });
+  h += '</tbody></table></div></div>';
+  h += '<p class="pista" style="margin-top:12px">Leads y constituciones salen de los clientes que tienen esa campaña ' +
+    'en su ficha. Si un cliente no la lleva, no cuenta aquí.</p>';
+  return h + '</div>';
+}
+
+function fCampana(x) {
+  var c = campana(x);
+  if (!c) return '';
+  var r = rendimiento(c);
+  var h = cabFicha(c.nombre, esc(c.plataforma || '') + (c.activa === false ? ' &middot; ' + pill('parada') : ''));
+  h += '<div class="cajon-cuerpo"><div class="bloque"><p class="bloque-t">Cómo va</p><dl class="datos">' +
+    '<dt>Gasto</dt><dd>' + esc(euros(c.gasto)) + '</dd>' +
+    '<dt>Leads</dt><dd>' + r.leads + (r.cpl ? ' &middot; ' + esc(euros(r.cpl)) + ' cada uno' : '') + '</dd>' +
+    '<dt>Ganados</dt><dd>' + r.ganados + '</dd>' +
+    '<dt>Constituidas</dt><dd>' + r.consts + (r.cpa ? ' &middot; ' + esc(euros(r.cpa)) + ' cada una' : '') + '</dd>' +
+    '<dt>Devuelto</dt><dd><strong>' + esc(euros(r.ingreso)) + '</strong></dd>' +
+    dato('Desde', fechaCorta(c.desde)) +
+  '</dl></div>';
+  var suyos = datos.clientes.filter(function (x2) { return x2.campanaId === c.id; }).slice(0, 8);
+  if (suyos.length) {
+    h += '<div class="bloque"><p class="bloque-t">Clientes que trajo</p>' + suyos.map(function (cl) {
+      return '<button class="fila" data-ficha="cliente" data-id="' + esc(cl.id) + '">' +
+        '<span class="ini ini-sm">' + esc(iniciales(cl.nombre)) + '</span>' +
+        '<span class="fila-c"><span class="fila-t">' + esc(cl.nombre) + '</span>' +
+        '<span class="fila-s">' + esc(estado(cl.estado).n) + '</span></span></button>';
+    }).join('') + '</div>';
+  }
+  if (c.notas) h += '<div class="bloque"><p class="bloque-t">Notas</p><p class="nota">' + esc(c.notas) + '</p></div>';
   return h + '</div><div class="cajon-pie">' +
-    '<button class="btn btn-suave btn-sm" data-editar="nota" data-id="' + esc(n.id) + '">Editar</button>' +
-    '<button class="btn btn-peligro btn-sm" data-borrar="nota" data-id="' + esc(n.id) + '">Eliminar</button></div>';
+    '<button class="btn btn-suave btn-sm" data-editar="campana" data-id="' + esc(c.id) + '">Editar</button>' +
+    '<button class="btn btn-peligro btn-sm" data-borrar="campana" data-id="' + esc(c.id) + '">Eliminar</button></div>';
+}
+
+/* -- Correos --------------------------------------------------- */
+
+var I_MAIL = '<svg viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2.4"/><path d="m3.5 6.8 7.7 5.7a1.4 1.4 0 0 0 1.6 0l7.7-5.7"/></svg>';
+
+/* Sustituciones que entiende una plantilla. Se aplican sobre el cliente
+   que este seleccionado; lo que no se sepa se deja en blanco, nunca se
+   inventa un dato. */
+var CAMPOS = [
+  { k: '{nombre}',   d: 'nombre del cliente' },
+  { k: '{empresa}',  d: 'empresa' },
+  { k: '{pais}',     d: 'país de destino' },
+  { k: '{precio}',   d: 'precio de ese país' },
+  { k: '{agente}',   d: 'quien escribe' }
+];
+
+function rellena(txt, cl) {
+  var p = cl ? pais(cl.pais) : null;
+  var pr = p ? precio(p.id) : 0;
+  return String(txt || '')
+    .replace(/\{nombre\}/g, cl ? cl.nombre : '')
+    .replace(/\{empresa\}/g, cl && cl.empresa ? cl.empresa : '')
+    .replace(/\{pais\}/g, p ? p.n : '')
+    .replace(/\{precio\}/g, pr ? euros(pr) : '')
+    .replace(/\{agente\}/g, yo().n);
+}
+
+function vCorreos() {
+  var h = '<div class="vista">' + cab('Correos', 'Las plantillas que usa el equipo y lo que se ha enviado',
+    '<button class="btn btn-tinta btn-sm" data-nuevo="plantilla">' + I_MAS + '<span>Nueva plantilla</span></button>');
+
+  h += segmentado('correos', [
+    { id: 'plantillas', n: 'Plantillas', n_: datos.plantillas.length },
+    { id: 'enviados', n: 'Enviados', n_: datos.correos.length }
+  ]);
+
+  if (filtro.correos === 'enviados') {
+    if (!datos.correos.length) {
+      return h + '<div class="tabla" style="margin-top:16px">' +
+        '<div class="vacio vacio-sm"><p class="vacio-t">Nada enviado todavía</p>' +
+        '<p class="vacio-p">Cuando anotes un envío desde una plantilla aparecerá aquí, con a quién y cuándo.</p></div></div></div>';
+    }
+    h += '<div class="tabla" style="margin-top:16px">' + datos.correos.slice().sort(function (a, b) {
+      return String(b.fecha || '').localeCompare(String(a.fecha || ''));
+    }).map(function (c) {
+      return '<div class="fila"><span class="ini ini-sm">' + esc(iniciales(nombreCliente(c.clienteId) || '?')) + '</span>' +
+        '<span class="fila-c"><span class="fila-t">' + esc(c.asunto) + '</span>' +
+        '<span class="fila-s">' + esc(nombreCliente(c.clienteId) || 'sin cliente') +
+        ' &middot; ' + esc(nombrePersona(c.quien) || '') + '</span></span>' +
+        '<span class="td-t">' + esc(fechaCorta(c.fecha)) + '</span></div>';
+    }).join('') + '</div></div>';
+    return h;
+  }
+
+  if (!datos.plantillas.length) {
+    return h + vacio(I_MAIL, 'Ninguna plantilla',
+      'Lo que escribís una y otra vez: el primer contacto, la lista de papeles, el aviso de que ya está constituida. Se escribe una vez y se reutiliza.',
+      '<button class="btn btn-tinta" data-nuevo="plantilla">' + I_MAS + '<span>Nueva plantilla</span></button>') + '</div>';
+  }
+
+  h += '<div class="paises" style="margin-top:16px">' + datos.plantillas.map(function (p) {
+    return '<div class="pais">' +
+      '<div class="pais-cab"><span class="pais-n">' + esc(p.nombre) + '</span>' +
+      (p.fase ? pill(fase(p.fase).n, fase(p.fase).c) : '') + '</div>' +
+      '<p class="pais-d" style="margin:0 0 14px">' + esc(p.asunto || 'sin asunto') + '</p>' +
+      '<div class="mini">' +
+        '<button class="btn btn-suave btn-sm" data-usar="' + esc(p.id) + '">Usar</button>' +
+        '<button class="btn btn-plano btn-sm" data-editar="plantilla" data-id="' + esc(p.id) + '">Editar</button>' +
+        '<button class="btn btn-plano btn-sm" data-borrar="plantilla" data-id="' + esc(p.id) + '">Quitar</button>' +
+      '</div></div>';
+  }).join('') + '</div>';
+  h += '<p class="pista" style="margin-top:14px">En el texto puedes usar ' +
+    CAMPOS.map(function (c) { return '<code>' + esc(c.k) + '</code>'; }).join(', ') +
+    '. Se sustituyen por los datos del cliente que elijas; lo que no se sepa se deja en blanco.</p>';
+  return h + '</div>';
+}
+
+/* Preparar un envio: elegir cliente, ver el texto ya sustituido, copiarlo
+   o abrirlo en el gestor de correo, y dejar constancia. */
+function usaPlantilla(pid, clienteId) {
+  var pl = plantilla(pid);
+  if (!pl) return;
+  var cl = clienteId ? cliente(clienteId) : null;
+  var dlg = $('#dlg');
+  var asunto = rellena(pl.asunto, cl), cuerpo = rellena(pl.texto, cl);
+
+  dlg.innerHTML = '<div class="dlg-cab"><h2 class="dlg-t">' + esc(pl.nombre) + '</h2></div>' +
+    '<div class="dlg-cuerpo">' +
+      sel('cliente', 'Para quién', opcCliente(clienteId || '')) +
+      '<div class="campo"><label>Asunto</label>' +
+        '<input id="vistaAsunto" type="text" value="' + esc(asunto) + '" readonly></div>' +
+      '<div class="campo"><label>Mensaje</label>' +
+        '<textarea id="vistaTexto" rows="9" readonly>' + esc(cuerpo) + '</textarea></div>' +
+      (cl && !cl.email ? '<p class="pista">Ese cliente no tiene correo en su ficha.</p>' : '') +
+    '</div><div class="dlg-pie">' +
+      '<button type="button" class="btn btn-suave" id="cancelar">Cerrar</button>' +
+      '<button type="button" class="btn btn-suave" id="copiar">Copiar</button>' +
+      '<button type="button" class="btn btn-tinta" id="abrirMail">Abrir en el correo</button>' +
+    '</div>';
+  dlg.showModal();
+
+  $('#cancelar').onclick = function () { dlg.close(); };
+  $('#f_cliente').onchange = function () { dlg.close(); usaPlantilla(pid, this.value); };
+
+  $('#copiar').onclick = function () {
+    var txt = $('#vistaAsunto').value + '\n\n' + $('#vistaTexto').value;
+    if (navigator.clipboard) navigator.clipboard.writeText(txt).then(function () { aviso('Copiado'); });
+    else { $('#vistaTexto').select(); aviso('Selecciona y copia'); }
+    anotaEnvio(pl, cl);
+  };
+  $('#abrirMail').onclick = function () {
+    var dest = cl && cl.email ? cl.email : '';
+    location.href = 'mailto:' + encodeURIComponent(dest) +
+      '?subject=' + encodeURIComponent($('#vistaAsunto').value) +
+      '&body=' + encodeURIComponent($('#vistaTexto').value);
+    anotaEnvio(pl, cl);
+    dlg.close();
+  };
+}
+
+/* Se apunta que se ha preparado el envio, no que el cliente lo haya
+   recibido: esto no manda correos, los prepara. */
+function eligePlantilla(clienteId) {
+  var dlg = $('#dlg');
+  dlg.innerHTML = '<div class="dlg-cab"><h2 class="dlg-t">¿Qué le escribimos?</h2></div>' +
+    '<div class="dlg-cuerpo" style="gap:0">' + datos.plantillas.map(function (p) {
+      return '<button class="fila" data-usar="' + esc(p.id) + '" data-para="' + esc(clienteId) + '">' +
+        '<span class="fila-c"><span class="fila-t">' + esc(p.nombre) + '</span>' +
+        '<span class="fila-s">' + esc(p.asunto) + '</span></span></button>';
+    }).join('') + '</div><div class="dlg-pie">' +
+    '<button type="button" class="btn btn-suave" id="cancelar">Cerrar</button></div>';
+  dlg.showModal();
+  $('#cancelar').onclick = function () { dlg.close(); };
+  $$('[data-usar]', dlg).forEach(function (b) {
+    b.onclick = function () { dlg.close(); usaPlantilla(b.dataset.usar, b.dataset.para); };
+  });
+}
+
+function anotaEnvio(pl, cl) {
+  datos.correos.unshift({
+    id: id(), plantillaId: pl.id, clienteId: cl ? cl.id : '',
+    asunto: rellena(pl.asunto, cl), fecha: hoy(), quien: datos.yo
+  });
+  if (datos.correos.length > 400) datos.correos.length = 400;
+  registra('Correo preparado: ' + pl.nombre + (cl ? ' → ' + cl.nombre : ''));
+  guardar();
+  contadores();
+}
+
+function fCorreo(x) {
+  var c = correo(x);
+  if (!c) return '';
+  var h = cabFicha(c.asunto, esc(nombreCliente(c.clienteId)));
+  h += '<div class="cajon-cuerpo"><div class="bloque"><p class="bloque-t">Datos</p><dl class="datos">' +
+    dato('Fecha', fechaCorta(c.fecha)) + dato('Preparado por', nombrePersona(c.quien)) +
+  '</dl></div></div>';
+  return h;
 }
 
 /* -- Ficha lateral --------------------------------------------- */
@@ -1354,7 +1548,8 @@ function fNota(x) {
 function abreFicha(tipo, oid) {
   var mapa = { cliente: fCliente, contacto: fContacto, expediente: fExpediente,
                tarea: fTarea, llamada: fLlamada, factura: fFactura,
-               documento: fDocumento, objetivo: fObjetivo, nota: fNota };
+               documento: fDocumento, objetivo: fObjetivo,
+               campana: fCampana, correo: fCorreo };
   var h = mapa[tipo] ? mapa[tipo](oid) : '';
   if (!h) return;
   var c = $('#cajon');
@@ -1392,7 +1587,8 @@ function fCliente(x) {
   h += '<div class="cajon-cuerpo">';
   var d = dato('Empresa', c.empresa) + dato('Correo', c.email) + dato('Teléfono', c.tel) +
           dato('País', p ? p.n : '') + dato('Origen', c.origen) +
-          dato('Asignado a', nombrePersona(c.asignado)) + dato('Alta', fechaCorta(c.creado));
+          dato('Asignado a', nombrePersona(c.asignado)) +
+          dato('Campaña', nombreCampana(c.campanaId)) + dato('Alta', fechaCorta(c.creado));
   if (d) h += '<div class="bloque"><p class="bloque-t">Datos</p><dl class="datos">' + d + '</dl></div>';
 
   h += '<div class="bloque"><p class="bloque-t">Estado</p><div class="mini">' +
@@ -1425,6 +1621,8 @@ function fCliente(x) {
     '<button class="btn btn-suave btn-sm" data-editar="cliente" data-id="' + esc(c.id) + '">Editar</button>' +
     '<button class="btn btn-suave btn-sm" data-nuevo="expediente" data-cliente="' + esc(c.id) + '">Nuevo expediente</button>' +
     '<button class="btn btn-suave btn-sm" data-nuevo="llamada" data-cliente="' + esc(c.id) + '">Anotar llamada</button>' +
+    (datos.plantillas.length
+      ? '<button class="btn btn-suave btn-sm" data-escribir="' + esc(c.id) + '">Escribir</button>' : '') +
     '<button class="btn btn-peligro btn-sm" data-borrar="cliente" data-id="' + esc(c.id) + '">Eliminar</button></div>';
 }
 
@@ -1570,6 +1768,12 @@ function opcExpediente(sel) {
     }).join('');
 }
 
+function opcCampana(sel) {
+  return '<option value="">— ninguna —</option>' + datos.campanas.map(function (c) {
+    return '<option value="' + esc(c.id) + '"' + (c.id === sel ? ' selected' : '') + '>' + esc(c.nombre) + '</option>';
+  }).join('');
+}
+
 function opcLista(lista, sel, vacia) {
   return (vacia ? '<option value="">— ' + esc(vacia) + ' —</option>' : '') + lista.map(function (o) {
     var v = o.id !== undefined ? o.id : o, n = o.n !== undefined ? o.n : o;
@@ -1591,7 +1795,10 @@ function sel(n, etq, opciones) {
 }
 
 function abreForm(tipo, oid, pre) {
-  var busq = { cliente: cliente, contacto: contacto, expediente: expediente, tarea: tarea, llamada: llamada };
+  var busq = { cliente: cliente, contacto: contacto, expediente: expediente, tarea: tarea,
+               llamada: llamada, factura: factura, documento: documento,
+               objetivo: function (i) { return busca_en(datos.objetivos, i); },
+               campana: campana, plantilla: plantilla };
   var reg = oid ? busq[tipo](oid) : null;
   if (oid && !reg) return;
   var r = reg || {}, p = pre || {}, cuerpo = '', titulo = '';
@@ -1603,6 +1810,7 @@ function abreForm(tipo, oid, pre) {
       '<div class="campo-2">' + campo('email', 'Correo', r.email, 'email') + campo('tel', 'Teléfono', r.tel, 'tel') + '</div>' +
       '<div class="campo-2">' + sel('pais', 'País de destino', opcLista(PAISES, r.pais, 'sin decidir')) +
         sel('origen', 'Origen', opcLista(ORIGENES, r.origen, 'sin indicar')) + '</div>' +
+      (datos.campanas.length ? sel('campanaId', 'Campaña que lo trajo', opcCampana(r.campanaId)) : '') +
       '<div class="campo-2">' + sel('estado', 'Estado', opcLista(ESTADOS, r.estado || 'sin')) +
         sel('prioridad', 'Prioridad', opcLista(PRIORIDADES, r.prioridad || 'media')) + '</div>' +
       sel('asignado', 'Asignado a', opcLista(datos.equipo, r.asignado || datos.yo, 'sin asignar')) +
@@ -1667,19 +1875,26 @@ function abreForm(tipo, oid, pre) {
       '<p class="pista">Lo logrado no se teclea: sale de las constituciones cerradas o de las facturas ' +
       'cobradas ese mes.</p>';
 
-  } else if (tipo === 'nota') {
-    titulo = reg ? 'Editar nota' : 'Nueva nota';
-    cuerpo = campo('titulo', 'Qué hay que recordar *', r.titulo, 'text', ' required autocomplete="off"') +
-      campo('etiqueta', 'Etiqueta', r.etiqueta, 'text', ' placeholder="Portugal, notaría, criterio…"') +
-      area('texto', 'Detalle', r.texto);
+  } else if (tipo === 'campana') {
+    titulo = reg ? 'Editar campaña' : 'Nueva campaña';
+    cuerpo = campo('nombre', 'Nombre *', r.nombre, 'text', ' required autocomplete="off" placeholder="Dubái - búsqueda - agosto"') +
+      '<div class="campo-2">' + sel('plataforma', 'Plataforma', opcLista(PLATAFORMAS, r.plataforma, 'sin indicar')) +
+        campo('gasto', 'Gasto (€) *', r.gasto, 'number', ' min="0" step="any" inputmode="decimal"') + '</div>' +
+      '<div class="campo-2">' + campo('desde', 'Desde', r.desde || (reg ? '' : hoy()), 'date') +
+        sel('activa', 'Estado', opcLista([{ id: 'si', n: 'En marcha' }, { id: 'no', n: 'Parada' }],
+                                          r.activa === false ? 'no' : 'si')) + '</div>' +
+      area('notas', 'Notas', r.notas) +
+      '<p class="pista">Los leads y las constituciones no se teclean: salen de los clientes que lleven esta campaña en su ficha.</p>';
 
-  } else if (tipo === 'enlace') {
-    titulo = reg ? 'Editar enlace' : 'Nuevo enlace';
-    cuerpo = campo('nombre', 'Nombre *', r.nombre, 'text', ' required autocomplete="off"') +
-      campo('url', 'Dirección *', r.url, 'text', ' autocomplete="off" placeholder="registro.example.com"') +
-      '<div class="campo-2">' + campo('grupo', 'Grupo', r.grupo, 'text', ' placeholder="Registros, Plantillas…"') +
-        campo('nota', 'Para qué', r.nota) + '</div>' +
-      '<p class="pista">Solo se aceptan direcciones http y https.</p>';
+  } else if (tipo === 'plantilla') {
+    titulo = reg ? 'Editar plantilla' : 'Nueva plantilla';
+    cuerpo = campo('nombre', 'Nombre *', r.nombre, 'text', ' required autocomplete="off" placeholder="Primer contacto"') +
+      sel('fase', 'Para qué fase', opcLista(FASES, r.fase, 'cualquiera')) +
+      campo('asunto', 'Asunto *', r.asunto, 'text', ' required autocomplete="off"') +
+      area('texto', 'Mensaje *', r.texto) +
+      '<p class="pista">Puedes usar ' + CAMPOS.map(function (c) {
+        return '<code>' + esc(c.k) + '</code>';
+      }).join(', ') + '. Se sustituyen al usarla.</p>';
 
   } else if (tipo === 'llamada') {
     titulo = reg ? 'Editar llamada' : 'Anotar llamada';
@@ -1722,7 +1937,8 @@ function envia(tipo, reg, fd) {
     var eAntes = r.estado;
     r.nombre = v('nombre'); r.empresa = v('empresa'); r.email = email; r.tel = v('tel');
     r.pais = v('pais'); r.origen = v('origen'); r.estado = v('estado') || 'sin';
-    r.prioridad = v('prioridad') || 'media'; r.asignado = v('asignado'); r.notas = v('notas');
+    r.prioridad = v('prioridad') || 'media'; r.asignado = v('asignado');
+    r.campanaId = v('campanaId'); r.notas = v('notas');
     if (nuevo) { datos.clientes.push(r); registra('Alta de ' + r.nombre); }
     else if (eAntes !== r.estado) registra(r.nombre + ': ' + estado(eAntes).n + ' → ' + estado(r.estado).n);
 
@@ -1798,17 +2014,20 @@ function envia(tipo, reg, fd) {
       registra('Objetivo de ' + (nombrePersona(r.personaId) || 'el equipo') + ' para ' + r.mes);
     }
 
-  } else if (tipo === 'nota') {
-    if (!v('titulo')) return error('La nota necesita al menos un título.');
-    r.titulo = v('titulo'); r.etiqueta = v('etiqueta'); r.texto = v('texto');
-    if (nuevo) { r.hecha = false; r.quien = datos.yo; datos.notas.push(r); }
+  } else if (tipo === 'campana') {
+    if (!v('nombre')) return error('La campaña necesita un nombre.');
+    var g = Number(v('gasto'));
+    if (!v('gasto') || isNaN(g) || g < 0) return error('El gasto tiene que ser un número positivo.');
+    r.nombre = v('nombre'); r.plataforma = v('plataforma'); r.gasto = g;
+    r.desde = v('desde'); r.activa = v('activa') !== 'no'; r.notas = v('notas');
+    if (nuevo) { datos.campanas.push(r); registra('Nueva campaña: ' + r.nombre); }
 
-  } else if (tipo === 'enlace') {
-    if (!v('nombre')) return error('El enlace necesita un nombre.');
-    var u = urlSegura(v('url'));
-    if (!u) return error('Esa dirección no vale: solo se aceptan http y https.');
-    r.nombre = v('nombre'); r.url = u; r.grupo = v('grupo') || 'General'; r.nota = v('nota');
-    if (nuevo) { datos.enlaces.push(r); registra('Nuevo enlace: ' + r.nombre); }
+  } else if (tipo === 'plantilla') {
+    if (!v('nombre')) return error('La plantilla necesita un nombre.');
+    if (!v('asunto')) return error('La plantilla necesita un asunto.');
+    if (!v('texto')) return error('La plantilla necesita un mensaje.');
+    r.nombre = v('nombre'); r.fase = v('fase'); r.asunto = v('asunto'); r.texto = v('texto');
+    if (nuevo) { datos.plantillas.push(r); registra('Nueva plantilla: ' + r.nombre); }
 
   } else if (tipo === 'llamada') {
     if (!v('clienteId')) return error('La llamada necesita un cliente.');
@@ -1832,14 +2051,14 @@ function borra(tipo, oid) {
   var listas = { cliente: datos.clientes, contacto: datos.contactos, expediente: datos.expedientes,
                  tarea: datos.tareas, llamada: datos.llamadas, factura: datos.facturas,
                  documento: datos.documentos, objetivo: datos.objetivos,
-                 nota: datos.notas, enlace: datos.enlaces };
+                 campana: datos.campanas, plantilla: datos.plantillas };
   var lista = listas[tipo];
   if (!lista) return;
   var i = -1;
   for (var k = 0; k < lista.length; k++) if (lista[k].id === oid) { i = k; break; }
   if (i < 0) return;
   var reg = lista[i];
-  var nombre = reg.nombre || reg.titulo || reg.resumen || reg.numero ||
+  var nombre = reg.nombre || reg.titulo || reg.resumen || reg.numero || reg.url ||
                (reg.tipo && tipoDoc(reg.tipo)) || 'el registro';
 
   /* Borrar un cliente dejaria contactos, expedientes y tareas colgando de
@@ -1847,12 +2066,18 @@ function borra(tipo, oid) {
   if (tipo === 'cliente') {
     var cs = datos.contactos.filter(function (o) { return o.clienteId === oid; }).length;
     var es = datos.expedientes.filter(function (o) { return o.clienteId === oid; }).length;
+    var fs = datos.facturas.filter(function (o) { return o.clienteId === oid; }).length;
     var extra = [];
     if (cs) extra.push(cs + (cs === 1 ? ' contacto' : ' contactos'));
     if (es) extra.push(es + (es === 1 ? ' expediente' : ' expedientes'));
+    if (fs) extra.push(fs + (fs === 1 ? ' factura' : ' facturas'));
     if (!window.confirm('Vas a eliminar ' + nombre + '.' +
       (extra.length ? ' Se quedan sin cliente ' + extra.join(' y ') + '.' : '') + ' No se puede deshacer.')) return;
-    [datos.contactos, datos.expedientes, datos.tareas, datos.llamadas].forEach(function (l) {
+    /* Las facturas tambien llevan clienteId: si no se limpian, quedan
+       apuntando a un cliente que ya no existe y la tabla muestra
+       "Sin cliente" sin que nadie sepa de quien era. */
+    [datos.contactos, datos.expedientes, datos.tareas, datos.llamadas,
+     datos.facturas].forEach(function (l) {
       l.forEach(function (o) { if (o.clienteId === oid) o.clienteId = ''; });
     });
   } else if (tipo === 'expediente') {
@@ -1918,6 +2143,13 @@ function exportaCsv(cual) {
     datos.tareas.forEach(function (t) {
       filas.push([t.titulo, tipoTarea(t.tipo).n, t.vence, t.hecha ? 'sí' : 'no', nombreCliente(t.clienteId), t.notas]);
     });
+  } else if (cual === 'campanas') {
+    filas.push(['Campaña', 'Plataforma', 'Gasto', 'Leads', 'Coste por lead', 'Constituidas', 'Coste por constitución', 'Devuelto']);
+    datos.campanas.forEach(function (c) {
+      var r2 = rendimiento(c);
+      filas.push([c.nombre, c.plataforma, c.gasto, r2.leads, Math.round(r2.cpl), r2.consts, Math.round(r2.cpa), r2.ingreso]);
+    });
+
   } else if (cual === 'informe') {
     filas.push(['Mes', 'Altas', 'Ganados', 'Constituidas', 'Facturado', 'Cobrado', 'Facturas']);
     var ahora = new Date(hoy() + 'T00:00:00');
@@ -1956,6 +2188,75 @@ function importaJson(fichero) {
     guardar();
     ir('panel');
     aviso(total + ' registros restaurados');
+  };
+  lector.onerror = function () { aviso('No se ha podido leer el fichero.'); };
+  lector.readAsText(fichero);
+}
+
+/* Lector de CSV suficiente para una lista de clientes: separador coma o
+   punto y coma, comillas dobles con escape duplicado. No pretende cubrir
+   todo el formato, y si algo no cuadra lo dice en vez de inventarse una
+   fila. */
+function leeCsv(txt) {
+  txt = String(txt).replace(/^\ufeff/, '');
+  var sep = (txt.split('\n')[0] || '').split(';').length >
+            (txt.split('\n')[0] || '').split(',').length ? ';' : ',';
+  var filas = [], campo = '', fila = [], dentro = false;
+  for (var i = 0; i < txt.length; i++) {
+    var c = txt[i];
+    if (dentro) {
+      if (c === '"') { if (txt[i + 1] === '"') { campo += '"'; i++; } else dentro = false; }
+      else campo += c;
+    } else if (c === '"') dentro = true;
+    else if (c === sep) { fila.push(campo); campo = ''; }
+    else if (c === '\n') { fila.push(campo); filas.push(fila); fila = []; campo = ''; }
+    else if (c !== '\r') campo += c;
+  }
+  if (campo || fila.length) { fila.push(campo); filas.push(fila); }
+  return filas.filter(function (f) { return f.some(function (x) { return String(x).trim(); }); });
+}
+
+function importaCsv(fichero) {
+  var lector = new FileReader();
+  lector.onload = function () {
+    var filas = leeCsv(String(lector.result));
+    if (filas.length < 2) { aviso('Ese CSV no trae filas.'); return; }
+
+    var cab = filas[0].map(function (x) { return String(x).trim().toLowerCase(); });
+    function col() {
+      for (var i = 0; i < arguments.length; i++) {
+        var k = cab.indexOf(arguments[i]);
+        if (k >= 0) return k;
+      }
+      return -1;
+    }
+    var iN = col('nombre', 'name', 'cliente');
+    if (iN < 0) { aviso('El CSV necesita una columna Nombre.'); return; }
+    var iE = col('empresa', 'company'), iC = col('correo', 'email', 'e-mail'),
+        iT = col('telefono', 'teléfono', 'phone'), iO = col('origen', 'source');
+
+    var nuevos = 0, repes = 0;
+    filas.slice(1).forEach(function (f) {
+      var nom = String(f[iN] || '').trim();
+      if (!nom) return;
+      if (datos.clientes.some(function (c) { return c.nombre.toLowerCase() === nom.toLowerCase(); })) { repes++; return; }
+      datos.clientes.push({
+        id: id(), creado: hoy(), nombre: nom,
+        empresa: iE >= 0 ? String(f[iE] || '').trim() : '',
+        email: iC >= 0 ? String(f[iC] || '').trim() : '',
+        tel: iT >= 0 ? String(f[iT] || '').trim() : '',
+        origen: iO >= 0 ? String(f[iO] || '').trim() : '',
+        estado: 'sin', prioridad: 'media', asignado: datos.yo
+      });
+      nuevos++;
+    });
+
+    if (!nuevos) { aviso(repes ? 'Todos estaban ya (' + repes + ').' : 'No he encontrado ninguna fila con nombre.'); return; }
+    registra('Importados ' + nuevos + ' clientes desde CSV');
+    guardar();
+    ir('clientes');
+    aviso(nuevos + (nuevos === 1 ? ' cliente importado' : ' clientes importados') +
+          (repes ? ', ' + repes + ' ya estaban' : ''));
   };
   lector.onerror = function () { aviso('No se ha podido leer el fichero.'); };
   lector.readAsText(fichero);
@@ -2025,9 +2326,10 @@ document.addEventListener('click', function (ev) {
   if ((e = t.closest('[data-cobro]'))) { mueveCobro(e.dataset.cobro, e.dataset.valor); return; }
   if ((e = t.closest('[data-estdoc]'))) { mueveDoc(e.dataset.estdoc, e.dataset.valor); return; }
   if ((e = t.closest('[data-valida]'))) { ev.stopPropagation(); mueveDoc(e.dataset.valida, 'validado'); return; }
-  if ((e = t.closest('[data-nota-hecha]'))) {
-    var nn = nota(e.dataset.notaHecha);
-    if (nn) { nn.hecha = !nn.hecha; guardar(); pinta(); }
+  if ((e = t.closest('[data-usar]'))) { usaPlantilla(e.dataset.usar); return; }
+  if ((e = t.closest('[data-escribir]'))) {
+    if (datos.plantillas.length === 1) usaPlantilla(datos.plantillas[0].id, e.dataset.escribir);
+    else eligePlantilla(e.dataset.escribir);
     return;
   }
   if ((e = t.closest('[data-estado]'))) { cambiaEstado(e.dataset.estado, e.dataset.valor); return; }
@@ -2053,6 +2355,7 @@ document.addEventListener('click', function (ev) {
   if (t.closest('#avisos')) { filtro.tareas = 'pendientes'; ir('tareas'); return; }
   if (t.id === 'expJson') { descarga('filnet-' + hoy() + '.json', JSON.stringify(datos, null, 2), 'application/json'); aviso('Copia descargada'); return; }
   if (t.id === 'impJson') { $('#ficheroJson').click(); return; }
+  if (t.id === 'impCsv') { $('#ficheroCsv').click(); return; }
   if (t.id === 'vaciar') { vaciaTodo(); return; }
   if (t.closest('#quienSoy') || t.id === 'salirSesion') {
     if (window.confirm('Cerrar la sesion de ' + yo().n + '?')) window.Acceso.salir();
@@ -2138,6 +2441,10 @@ function ponPrecio(paisId) {
 document.addEventListener('change', function (ev) {
   if (ev.target.id === 'ficheroJson' && ev.target.files && ev.target.files[0]) {
     importaJson(ev.target.files[0]);
+    ev.target.value = '';
+  }
+  if (ev.target.id === 'ficheroCsv' && ev.target.files && ev.target.files[0]) {
+    importaCsv(ev.target.files[0]);
     ev.target.value = '';
   }
   if (ev.target.dataset && ev.target.dataset.calc) {
