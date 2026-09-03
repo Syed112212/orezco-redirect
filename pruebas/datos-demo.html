@@ -1,0 +1,59 @@
+<!doctype html><meta charset="utf-8">
+<script>
+/* Estas paginas escriben y borran el almacen del navegador. Fuera de
+   local no deben ejecutarse nunca: alguien que llegara por un enlace
+   perderia sus datos sin tocar nada. */
+(function () {
+  var h = location.hostname;
+  if (h === 'localhost' || h === '127.0.0.1' || h === '') return;
+  document.documentElement.innerHTML =
+    '<body style="font:15px system-ui;padding:40px;max-width:32em">' +
+    '<h1 style="font-size:20px">Pagina de pruebas</h1>' +
+    '<p>Solo funciona sirviendo el proyecto en local. Escribe en el almacen ' +
+    'del navegador, asi que aqui se queda parada a proposito.</p>' +
+    '<p><a href="/">Ir al CRM</a></p></body>';
+  throw new Error('pagina de pruebas fuera de local');
+})();
+</script>
+<title>seed</title>
+<script>
+// Fichero de prueba local. No se publica: se borra antes del commit.
+var hoy = new Date();
+function d(n){var x=new Date(hoy);x.setDate(x.getDate()+n);return x.toISOString().slice(0,10);}
+localStorage.setItem('orezco.crm.v1', JSON.stringify({
+ v:1,
+ empresas:[
+  {id:'e1',nombre:'Talleres Marbán',nif:'B12345678',sector:'Automoción',estado:'cliente',tel:'963 112 233',email:'admin@marban.example',ciudad:'Valencia',web:'https://marban.example',notas:'Facturan a 60 días.\nPreguntar por la ampliación del taller 2.'},
+  {id:'e2',nombre:'Distribuciones Ávila e Hijos',nif:'B87654321',sector:'Alimentación',estado:'lead',tel:'915 004 411',email:'compras@avila.example',ciudad:'Madrid'},
+  {id:'e3',nombre:'Nortec Ingeniería',sector:'Industrial',estado:'cliente',ciudad:'Bilbao',email:'info@nortec.example'},
+  {id:'e4',nombre:'Cerámicas del Sur',sector:'Construcción',estado:'inactivo',ciudad:'Sevilla'}
+ ],
+ contactos:[
+  {id:'c1',nombre:'Rosa Marbán',cargo:'Administración',empresaId:'e1',email:'rosa@marban.example',tel:'600 111 222'},
+  {id:'c2',nombre:'Íñigo Aramburu',cargo:'Director de compras',empresaId:'e2',email:'inigo@avila.example'},
+  {id:'c3',nombre:'Chelo Ferrán',cargo:'Gerente',empresaId:'e3',tel:'944 556 677'}
+ ],
+ oportunidades:[
+  {id:'o1',titulo:'Renovación de 12 licencias',empresaId:'e1',valor:8400,etapa:'negociacion',cierre:d(14),notas:'Piden descuento por volumen.'},
+  {id:'o2',titulo:'Implantación inicial',empresaId:'e2',valor:15200,etapa:'propuesta',cierre:d(30)},
+  {id:'o3',titulo:'Módulo de inventario',empresaId:'e3',valor:4300,etapa:'cualificada',cierre:d(45)},
+  {id:'o4',titulo:'Migración desde hoja de cálculo',empresaId:'e1',valor:2600,etapa:'contacto'},
+  {id:'o5',titulo:'Ampliación a 3 sedes',empresaId:'e3',valor:11000,etapa:'ganada',cerrado:d(-3)},
+  {id:'o6',titulo:'Piloto de 6 meses',empresaId:'e4',valor:3200,etapa:'perdida',cerrado:d(-20)}
+ ],
+ tareas:[
+  {id:'t1',titulo:'Llamar a Rosa por el descuento',tipo:'llamada',vence:d(-2),hecha:false,empresaId:'e1'},
+  {id:'t2',titulo:'Enviar la propuesta revisada',tipo:'email',vence:d(0),hecha:false,empresaId:'e2'},
+  {id:'t3',titulo:'Reunión de arranque',tipo:'reunion',vence:d(3),hecha:false,empresaId:'e3'},
+  {id:'t4',titulo:'Preparar comparativa de precios',tipo:'tarea',vence:d(9),hecha:false,empresaId:'e2'},
+  {id:'t5',titulo:'Confirmar los datos fiscales',tipo:'tarea',vence:d(-6),hecha:true,empresaId:'e1'}
+ ],
+ actividad:[
+  {id:'a1',fecha:new Date().toISOString(),texto:'Ampliación a 3 sedes: Negociacion -> Ganada',ref:'o5'},
+  {id:'a2',fecha:new Date().toISOString(),texto:'Alta de Distribuciones Ávila e Hijos',ref:'e2'},
+  {id:'a3',fecha:new Date().toISOString(),texto:'Nueva oportunidad: Implantación inicial',ref:'o2'}
+ ]
+}));
+document.title = 'listo';
+</script>
+<p>Datos de prueba cargados.

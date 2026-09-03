@@ -1,0 +1,174 @@
+<!doctype html><meta charset="utf-8">
+<script>
+/* Estas paginas escriben y borran el almacen del navegador. Fuera de
+   local no deben ejecutarse nunca: alguien que llegara por un enlace
+   perderia sus datos sin tocar nada. */
+(function () {
+  var h = location.hostname;
+  if (h === 'localhost' || h === '127.0.0.1' || h === '') return;
+  document.documentElement.innerHTML =
+    '<body style="font:15px system-ui;padding:40px;max-width:32em">' +
+    '<h1 style="font-size:20px">Pagina de pruebas</h1>' +
+    '<p>Solo funciona sirviendo el proyecto en local. Escribe en el almacen ' +
+    'del navegador, asi que aqui se queda parada a proposito.</p>' +
+    '<p><a href="/">Ir al CRM</a></p></body>';
+  throw new Error('pagina de pruebas fuera de local');
+})();
+</script>
+<title>pruebas</title>
+<!-- Pruebas de humo. Fichero local, no se publica: se borra antes del commit.
+     Conduce la aplicacion real dentro de un iframe y comprueba el resultado
+     en el DOM y en localStorage. -->
+<style>body{font:13px ui-monospace,monospace;padding:16px}
+b.ok{color:#0a7a24}b.no{color:#b00}#marco{width:1200px;height:800px;border:1px solid #ccc}</style>
+<ul id="salida"></ul>
+<iframe id="marco" src="/#panel"></iframe>
+<script>
+var out = document.getElementById('salida');
+var fallos = 0, total = 0;
+function comprueba(nombre, cond, detalle) {
+  total++;
+  if (!cond) fallos++;
+  var li = document.createElement('li');
+  li.innerHTML = '<b class="' + (cond ? 'ok' : 'no') + '">' + (cond ? 'PASA' : 'FALLA') + '</b> ' +
+                 nombre + (detalle && !cond ? ' — ' + detalle : '');
+  out.appendChild(li);
+}
+
+// Errores de JS dentro del iframe: se recogen antes de que cargue.
+var errores = [];
+window.addEventListener('error', function (e) { errores.push(String(e.message)); });
+
+localStorage.removeItem('orezco.crm.v1');
+
+var f = document.getElementById('marco');
+f.onload = function () {
+  var w = f.contentWindow, d = f.contentDocument;
+  w.addEventListener('error', function (e) { errores.push(String(e.message)); });
+  setTimeout(arranca, 400);
+
+  function $(s) { return d.querySelector(s); }
+  function $$(s) { return Array.prototype.slice.call(d.querySelectorAll(s)); }
+  function guardado() { try { return JSON.parse(w.localStorage.getItem('orezco.crm.v1')) || {}; } catch (e) { return {}; } }
+  function rellena(campo, valor) {
+    var el = $('#f_' + campo);
+    if (!el) return false;
+    el.value = valor;
+    el.dispatchEvent(new w.Event('input', { bubbles: true }));
+    return true;
+  }
+  function envia() { $('#form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); }
+
+  function arranca() {
+    // 1. Arranca sin errores y con el estado vacio honesto
+    comprueba('Arranca sin errores de JavaScript', errores.length === 0, errores.join(' | '));
+    comprueba('Empieza vacio, sin datos de ejemplo',
+      /Aún no hay nada dentro/.test(d.body.textContent), 'no aparece el estado vacio');
+
+    // 2. El boton Nuevo abre el formulario
+    $('#btnNuevo').click();
+    comprueba('El boton Nuevo abre el formulario', !!$('#form') && $('#dlg').open);
+
+    // 3. Un formulario vacio no crea nada
+    envia();
+    comprueba('Rechaza la empresa sin nombre',
+      $('#formError') && !$('#formError').hidden && (guardado().empresas || []).length === 0,
+      'deberia mostrar error y no guardar');
+
+    // 4. Valida el correo
+    rellena('nombre', 'Probadora SL');
+    rellena('email', 'esto-no-es-correo');
+    envia();
+    comprueba('Rechaza un correo mal escrito',
+      $('#formError') && /correo/.test($('#formError').textContent) && (guardado().empresas || []).length === 0);
+
+    // 5. Crea la empresa
+    rellena('email', 'hola@probadora.example');
+    rellena('sector', 'Pruebas');
+    envia();
+    var g = guardado();
+    comprueba('Crea la empresa y la guarda', (g.empresas || []).length === 1 && g.empresas[0].nombre === 'Probadora SL');
+    comprueba('La empresa sale en la vista',
+      (function () { $$('.nav-i').filter(function (b) { return b.dataset.vista === 'empresas'; })[0].click();
+        return /Probadora SL/.test(d.body.textContent); })());
+
+    // 6. XSS: el nombre con etiquetas se muestra como texto, no se ejecuta
+    $('#btnNuevo').click();
+    rellena('nombre', '<img src=x onerror="window.__roto=1">Maliciosa');
+    envia();
+    var hayImg = $$('td img').length > 0;
+    comprueba('Un nombre con etiquetas no inyecta HTML', !hayImg && !w.__roto);
+    comprueba('Y se ve tal cual lo escribio el usuario',
+      d.body.textContent.indexOf('<img src=x') >= 0);
+
+    // 7. Oportunidad, valor y embudo
+    $$('.nav-i').filter(function (b) { return b.dataset.vista === 'embudo'; })[0].click();
+    $('#btnNuevo').click();
+    rellena('titulo', 'Venta de prueba');
+    rellena('valor', '1500');
+    rellena('etapa', 'propuesta');
+    envia();
+    var g2 = guardado();
+    comprueba('Crea la oportunidad con su valor',
+      (g2.oportunidades || []).length === 1 && g2.oportunidades[0].valor === 1500 && g2.oportunidades[0].etapa === 'propuesta');
+    comprueba('El total del embudo suma bien',
+      /1500\s*€/.test(d.body.textContent.replace(/ /g, ' ')), 'no encuentro 1500 € en el embudo');
+
+    // 8. Rechaza un valor negativo
+    var tj = $('.tj'); tj.click();
+    $('[data-editar="oportunidad"]').click();
+    rellena('valor', '-40');
+    envia();
+    comprueba('Rechaza un valor negativo',
+      $('#formError') && !$('#formError').hidden && guardado().oportunidades[0].valor === 1500);
+    $('#cancelar').click();
+
+    // 9. Cambiar de etapa desde la ficha
+    $('[data-mover][data-etapa="ganada"]').click();
+    var g3 = guardado();
+    comprueba('Mover a Ganada cambia la etapa y anota la fecha',
+      g3.oportunidades[0].etapa === 'ganada' && !!g3.oportunidades[0].cerrado);
+    comprueba('El cambio queda registrado en la actividad',
+      (g3.actividad || []).some(function (a) { return /Ganada/.test(a.texto); }));
+
+    // 10. Tareas
+    $$('.nav-i').filter(function (b) { return b.dataset.vista === 'tareas'; })[0].click();
+    $('#btnNuevo').click();
+    rellena('titulo', 'Llamar el lunes');
+    envia();
+    comprueba('Crea la tarea', (guardado().tareas || []).length === 1);
+    var antes = $('.nav-n[data-cuenta="tareas"]').textContent;
+    $('[data-hecha]').click();
+    comprueba('Marcarla hecha baja el contador',
+      guardado().tareas[0].hecha === true && $('.nav-n[data-cuenta="tareas"]').textContent !== antes,
+      'antes=' + antes + ' ahora=' + $('.nav-n[data-cuenta="tareas"]').textContent);
+
+    // 11. Buscador
+    var b = $('#buscar');
+    b.value = 'Probadora';
+    b.dispatchEvent(new w.Event('input', { bubbles: true }));
+    comprueba('El buscador encuentra la empresa',
+      !$('#resultados').hidden && /Probadora SL/.test($('#resultados').textContent));
+
+    // 12. Ocultos de verdad (la colision de [hidden] con display:flex)
+    $('#buscar').value = '';
+    $('#buscar').dispatchEvent(new w.Event('input', { bubbles: true }));
+    comprueba('La ficha lateral esta realmente oculta',
+      w.getComputedStyle($('#cajon')).display === 'none');
+    comprueba('El aviso esta realmente oculto',
+      $('#aviso').hidden === false || w.getComputedStyle($('#aviso')).display !== 'block');
+
+    // 13. Las direcciones por ancla funcionan
+    w.location.hash = 'ajustes';
+    setTimeout(function () {
+      comprueba('El ancla cambia de vista', /Dónde están tus datos/.test(d.body.textContent));
+      comprueba('Sigue sin errores de JavaScript al final', errores.length === 0, errores.join(' | '));
+      document.title = fallos === 0 ? 'TODO OK ' + total + '/' + total : 'FALLOS ' + fallos + '/' + total;
+      var res = document.createElement('p');
+      res.id = 'resumen';
+      res.textContent = 'RESULTADO: ' + (total - fallos) + '/' + total + ' pasan, ' + fallos + ' fallan';
+      out.parentNode.insertBefore(res, out);
+    }, 300);
+  }
+};
+</script>

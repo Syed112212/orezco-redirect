@@ -1,0 +1,33 @@
+<!doctype html><meta charset="utf-8">
+<script>
+/* Estas paginas escriben y borran el almacen del navegador. Fuera de
+   local no deben ejecutarse nunca: alguien que llegara por un enlace
+   perderia sus datos sin tocar nada. */
+(function () {
+  var h = location.hostname;
+  if (h === 'localhost' || h === '127.0.0.1' || h === '') return;
+  document.documentElement.innerHTML =
+    '<body style="font:15px system-ui;padding:40px;max-width:32em">' +
+    '<h1 style="font-size:20px">Pagina de pruebas</h1>' +
+    '<p>Solo funciona sirviendo el proyecto en local. Escribe en el almacen ' +
+    'del navegador, asi que aqui se queda parada a proposito.</p>' +
+    '<p><a href="/">Ir al CRM</a></p></body>';
+  throw new Error('pagina de pruebas fuera de local');
+})();
+</script>
+<title>marco movil</title>
+<!-- Fichero de prueba local. No se publica: se borra antes del commit.
+     Chrome headless en Windows no rinde por debajo de ~500px de ancho,
+     asi que el viewport real se simula con un iframe del ancho exacto. -->
+<style>
+  body{margin:0;background:#555;display:flex;gap:20px;padding:20px;font:12px system-ui;color:#fff}
+  figure{margin:0}
+  figcaption{margin-bottom:6px}
+  iframe{border:0;background:#fff;display:block}
+</style>
+<figure><figcaption>390 x 760 (iPhone)</figcaption>
+  <iframe src="/#panel" width="390" height="760"></iframe></figure>
+<figure><figcaption>390 x 760 (embudo)</figcaption>
+  <iframe src="/#embudo" width="390" height="760"></iframe></figure>
+<figure><figcaption>320 x 760 (el mas estrecho)</figcaption>
+  <iframe src="/#empresas" width="320" height="760"></iframe></figure>

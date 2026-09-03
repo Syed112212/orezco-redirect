@@ -3,29 +3,96 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Orezco ahora es Contaes</title>
-<link rel="canonical" href="https://contaes.com/">
+<title>Orezco — CRM</title>
+<meta name="description" content="Orezco es un CRM sencillo: empresas, contactos, oportunidades y tareas en un embudo que se entiende de un vistazo.">
 <meta name="robots" content="noindex, follow">
-<meta http-equiv="refresh" content="0; url=https://contaes.com/">
-<style>
-  body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f6f5f4;color:#000;
-       font:16px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-       text-align:center;padding:24px}
-  h1{font-size:clamp(26px,5vw,38px);font-weight:600;letter-spacing:-.03em;margin:0 0 12px}
-  p{margin:0 0 22px;color:#615d59}
-  a{display:inline-block;background:#0075de;color:#fff;text-decoration:none;
-    padding:13px 20px;border-radius:8px;font-weight:500}
-</style>
-<script>
-  // Conserva la ruta: /blog/x en orezco.com acaba en contaes.com/blog/x
-  location.replace("https://contaes.com" + location.pathname + location.search + location.hash);
-</script>
+<meta name="color-scheme" content="light">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/app.css?v=6">
+<link rel="icon" href="assets/marca.svg" type="image/svg+xml">
 </head>
 <body>
-  <main>
-    <h1>Orezco ahora es Contaes</h1>
-    <p>Te estamos llevando a la dirección nueva.</p>
-    <a href="https://contaes.com/">Ir a contaes.com</a>
-  </main>
+
+<a class="saltar" href="#principal">Saltar al contenido</a>
+
+<!-- ── Barra lateral ───────────────────────────────────────── -->
+<aside class="lateral" id="lateral">
+  <div class="lateral-marca">
+    <svg class="marca" viewBox="0 0 200 200" role="img" aria-label="Orezco">
+      <polygon points="100,26 166,63 166,137 100,174 34,137 34,63"
+               fill="currentColor" stroke="currentColor" stroke-width="26" stroke-linejoin="round"/>
+      <g stroke="var(--logo-bg)" stroke-width="13" stroke-linecap="round" fill="none">
+        <path d="M100 100 L38 64"/><path d="M100 100 L162 64"/><path d="M100 100 L100 172"/>
+      </g>
+      <g stroke="currentColor" stroke-width="15" stroke-linecap="round">
+        <path d="M100 44 L100 156"/><path d="M51.5 72 L148.5 128"/><path d="M51.5 128 L148.5 72"/>
+      </g>
+    </svg>
+    <span class="lateral-nombre">Orezco</span>
+  </div>
+
+  <nav class="lateral-nav" aria-label="Secciones">
+    <button class="nav-i" data-vista="panel" aria-current="page">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="2.5" width="6.5" height="6.5" rx="1.5"/><rect x="11" y="2.5" width="6.5" height="4" rx="1.5"/><rect x="11" y="8.5" width="6.5" height="9" rx="1.5"/><rect x="2.5" y="11" width="6.5" height="6.5" rx="1.5"/></svg>
+      <span>Panel</span></button>
+    <button class="nav-i" data-vista="embudo">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3" width="4" height="14" rx="1.5"/><rect x="8" y="3" width="4" height="10" rx="1.5"/><rect x="13.5" y="3" width="4" height="6" rx="1.5"/></svg>
+      <span>Embudo</span><em class="nav-n" data-cuenta="oportunidades"></em></button>
+    <button class="nav-i" data-vista="empresas">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 17V5.5a1.5 1.5 0 0 1 1.5-1.5h5A1.5 1.5 0 0 1 11 5.5V17"/><path d="M11 17V9h4.5A1.5 1.5 0 0 1 17 10.5V17"/><path d="M2 17h16"/><path d="M5.5 7h3M5.5 10h3M5.5 13h3M13 12h1.5"/></svg>
+      <span>Empresas</span><em class="nav-n" data-cuenta="empresas"></em></button>
+    <button class="nav-i" data-vista="contactos">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="6.5" r="3"/><path d="M3.5 17a6.5 6.5 0 0 1 13 0"/></svg>
+      <span>Contactos</span><em class="nav-n" data-cuenta="contactos"></em></button>
+    <button class="nav-i" data-vista="tareas">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3.5" width="14" height="13.5" rx="2"/><path d="M3 7h14M6.5 2v3M13.5 2v3"/><path d="m7 12 2 2 4-4"/></svg>
+      <span>Tareas</span><em class="nav-n nav-n-alerta" data-cuenta="tareas"></em></button>
+  </nav>
+
+  <div class="lateral-pie">
+    <button class="nav-i nav-i-tenue" data-vista="ajustes">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="2.75"/><path d="M10 1.8v2M10 16.2v2M16.5 10h1.7M1.8 10h1.7M14.6 5.4l1.2-1.2M4.2 15.8l1.2-1.2M14.6 14.6l1.2 1.2M4.2 4.2l1.2 1.2"/></svg>
+      <span>Ajustes</span></button>
+    <p class="lateral-nota">Los datos se guardan en este navegador.<br><a href="#" data-ir="ajustes">Haz copia de seguridad</a></p>
+  </div>
+</aside>
+
+<div class="velo" id="velo" hidden></div>
+
+<!-- ── Contenido ───────────────────────────────────────────── -->
+<main id="principal" class="principal">
+
+  <header class="cabecera">
+    <button class="menu-movil" id="menuMovil" aria-label="Abrir el menú" aria-expanded="false">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14"/></svg>
+    </button>
+    <div class="buscador">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.75" cy="8.75" r="5.25"/><path d="m12.6 12.6 4 4"/></svg>
+      <input type="search" id="buscar" placeholder="Buscar empresas, contactos y oportunidades" aria-label="Buscar" autocomplete="off">
+      <kbd>/</kbd>
+    </div>
+    <button class="btn btn-verde" id="btnNuevo">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>
+      <span>Nuevo</span>
+    </button>
+  </header>
+
+  <div id="resultados" class="resultados" hidden></div>
+
+  <div id="vistas"></div>
+</main>
+
+<!-- ── Ficha lateral ───────────────────────────────────────── -->
+<div class="cajon-fondo" id="cajonFondo" hidden></div>
+<section class="cajon" id="cajon" hidden aria-label="Ficha" role="dialog" aria-modal="true"></section>
+
+<!-- ── Diálogo ─────────────────────────────────────────────── -->
+<dialog class="dlg" id="dlg"></dialog>
+
+<div class="aviso" id="aviso" role="status" aria-live="polite" hidden></div>
+
+<script src="assets/app.js?v=6"></script>
 </body>
 </html>

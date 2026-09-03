@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Orezco">
+  <title>Orezco</title>
+  <rect width="200" height="200" rx="44" fill="#121613"/>
+  <g color="#2bee4b">
+    <!-- cuerpo: hexagono con esquinas redondeadas (stroke grueso + linejoin round) -->
+    <polygon points="100,42 152,71 152,129 100,158 48,129 48,71"
+             fill="currentColor" stroke="currentColor" stroke-width="20" stroke-linejoin="round"/>
+    <!-- divisiones del cubo (Y invertida), en el color del fondo -->
+    <g stroke="#121613" stroke-width="10" stroke-linecap="round" fill="none">
+      <path d="M100 100 L52 72"/>
+      <path d="M100 100 L148 72"/>
+      <path d="M100 100 L100 156"/>
+    </g>
+    <!-- destello de 6 puntas -->
+    <g stroke="currentColor" stroke-width="12" stroke-linecap="round">
+      <path d="M100 56 L100 144"/>
+      <path d="M62 78 L138 122"/>
+      <path d="M62 122 L138 78"/>
+    </g>
+  </g>
+</svg>
