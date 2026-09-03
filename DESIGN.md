@@ -11,9 +11,7 @@ tema oscuro alternativo, todos los colores se pintan explícitamente.
 
 Referencia de partida: `styles.refero.design/style/1a519123-071a-449f-b5df-0def73ed7f35`
 
-Esta dirección es la que se eligió para Orezco antes del cambio de marca, y se
-recupera aquí. **No se parece a contaes.com a propósito**: son dos productos
-distintos y no deben confundirse.
+Es la dirección que se eligió para Orezco desde el principio y la que manda aquí.
 
 ## Color
 

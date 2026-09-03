@@ -3,10 +3,6 @@
 Un CRM pequeño: empresas, contactos, oportunidades en un embudo, y tareas con fecha.
 Vive en **orezco.com**.
 
-No hay que confundirlo con **contaes.com**, que es la gestoría y se publica desde otro
-repositorio (`Syed112212/orezco`, sí, con el nombre cambiado). Este repositorio y aquel
-no se tocan entre sí.
-
 ## Cómo está hecho
 
 HTML, CSS y JavaScript a pelo. Sin framework, sin compilación, sin dependencias: se
