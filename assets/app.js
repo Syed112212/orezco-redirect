@@ -169,7 +169,7 @@ function pill(texto, clase) {
 /* -- Almacén --------------------------------------------------- */
 
 var VACIO = { v: 1, clientes: [], contactos: [], expedientes: [], tareas: [], llamadas: [],
-              facturas: [], documentos: [], objetivos: [],
+              facturas: [], documentos: [], objetivos: [], notas: [], enlaces: [],
               precios: {}, actividad: [], equipo: EQUIPO_INICIAL.slice(), yo: 'carlos' };
 var datos = cargar();
 
@@ -189,7 +189,7 @@ function normaliza(d) {
   var base = JSON.parse(JSON.stringify(VACIO));
   if (!d || typeof d !== 'object') return base;
   ['clientes', 'contactos', 'expedientes', 'tareas', 'llamadas', 'actividad',
-   'facturas', 'documentos', 'objetivos'].forEach(function (k) {
+   'facturas', 'documentos', 'objetivos', 'notas', 'enlaces'].forEach(function (k) {
     if (Array.isArray(d[k])) base[k] = d[k].filter(function (x) { return x && typeof x === 'object'; });
   });
   if (d.precios && typeof d.precios === 'object') base.precios = d.precios;
@@ -222,6 +222,8 @@ function normaliza(d) {
     if (!busca_en(EST_DOC, dc.estado)) dc.estado = 'pedido';
   });
   base.objetivos.forEach(function (o) { if (!o.id) o.id = id(); o.meta = Number(o.meta) || 0; });
+  base.notas.forEach(function (n) { if (!n.id) n.id = id(); });
+  base.enlaces.forEach(function (e) { if (!e.id) e.id = id(); });
   return base;
 }
 
@@ -247,6 +249,20 @@ function tarea(x) { return busca_en(datos.tareas, x); }
 function llamada(x) { return busca_en(datos.llamadas, x); }
 function factura(x) { return busca_en(datos.facturas, x); }
 function documento(x) { return busca_en(datos.documentos, x); }
+function nota(x) { return busca_en(datos.notas, x); }
+function enlace(x) { return busca_en(datos.enlaces, x); }
+
+/* Solo se aceptan http y https. Un enlace con javascript: o data: seria
+   una puerta abierta dentro de la propia herramienta. */
+function urlSegura(u) {
+  var s = String(u || '').trim();
+  if (!s) return '';
+  if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
+  try {
+    var x = new URL(s);
+    return (x.protocol === 'http:' || x.protocol === 'https:') ? x.href : '';
+  } catch (e) { return ''; }
+}
 function cobro(x) { return busca_en(COBROS, x) || COBROS[0]; }
 function estDoc(x) { return busca_en(EST_DOC, x) || EST_DOC[0]; }
 function tipoDoc(x) { var d = busca_en(DOCS, x); return d ? d.n : (x || 'Documento'); }
@@ -287,8 +303,8 @@ function aviso(texto, accion, alPulsar) {
 /* -- Enrutado -------------------------------------------------- */
 
 var VISTAS = ['panel', 'clientes', 'contactos', 'expedientes', 'paises', 'calculadora',
-              'facturacion', 'tareas', 'calendario', 'llamadas', 'objetivos',
-              'documentos', 'canales', 'usuarios', 'ajustes'];
+              'facturacion', 'tareas', 'calendario', 'llamadas', 'objetivos', 'informes',
+              'documentos', 'canales', 'usuarios', 'notas', 'enlaces', 'actividad', 'ajustes'];
 var vistaActual = 'panel';
 var filtro = { clientes: 'todos', expedientes: 'todos', tareas: 'pendientes',
                facturacion: 'todas', documentos: 'pendientes' };
@@ -320,7 +336,8 @@ function pinta() {
     panel: vPanel, clientes: vClientes, contactos: vContactos, expedientes: vExpedientes,
     paises: vPaises, calculadora: vCalculadora, facturacion: vFacturacion, tareas: vTareas,
     calendario: vCalendario, llamadas: vLlamadas, objetivos: vObjetivos,
-    documentos: vDocumentos, canales: vCanales, usuarios: vUsuarios, ajustes: vAjustes
+    documentos: vDocumentos, canales: vCanales, usuarios: vUsuarios, informes: vInformes,
+    notas: vNotas, enlaces: vEnlaces, actividad: vActividad, ajustes: vAjustes
   };
   $('#vistas').innerHTML = (mapa[vistaActual] || vPanel)();
   contadores();
@@ -342,6 +359,8 @@ function contadores() {
   }));
   pon('documentos', docsPendientes().length, datos.documentos.some(function (dc) { return dc.estado === 'rechazado'; }));
   pon('usuarios', datos.equipo.length);
+  pon('notas', datos.notas.filter(function (n) { return !n.hecha; }).length);
+  pon('enlaces', datos.enlaces.length);
   var av = vencidas().length;
   $('#avisosN').textContent = av > 99 ? '99+' : String(av);
   var y = yo();
@@ -1142,12 +1161,200 @@ function vUsuarios() {
   return h + '</div>';
 }
 
+/* -- Informes -------------------------------------------------- */
+
+var I_INF = '<svg viewBox="0 0 24 24"><path d="M5 3.5h9l5 5v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1Z"/><path d="M14 3.5V9h5"/><path d="M8 17v-4M12 17v-7M16 17v-3"/></svg>';
+
+function vInformes() {
+  var h = '<div class="vista">' + cab('Informes', 'El resumen del mes, sin llevar la cuenta aparte',
+    '<button class="btn btn-suave btn-sm" data-csv="informe">Descargar CSV</button>');
+
+  var mes = mesActual();
+  var f = informeMes(mes);
+  if (!f.clientes && !f.expedientes && !f.facturado) {
+    return h + vacio(I_INF, 'Nada que resumir todavía',
+      'En cuanto haya clientes, expedientes o facturas, aquí sale el mes cerrado: altas, constituciones, facturado y cobrado. No se teclea nada.') + '</div>';
+  }
+
+  h += '<div class="kpis">' +
+    kpi(I_CLIENTE, 'Altas del mes', String(f.clientes), f.ganados + ' ganados') +
+    kpi(I_EXP, 'Constituidas', String(f.constituidas), f.abiertas + ' abiertas al cierre') +
+    kpi(I_FACT, 'Facturado', euros(f.facturado), f.nFacturas + (f.nFacturas === 1 ? ' factura' : ' facturas')) +
+    kpi(I_FACT, 'Cobrado', euros(f.cobrado), f.facturado ? Math.round(f.cobrado / f.facturado * 100) + '% de lo emitido' : '—') +
+  '</div>';
+
+  h += '<div class="rejilla"><div class="caja"><div class="caja-cab">' +
+      '<h2 class="caja-t">Por persona <small>/ este mes</small></h2></div><div class="reparto">';
+  var maxP = 1;
+  var porP = datos.equipo.map(function (p) {
+    var n = datos.expedientes.filter(function (e) {
+      return e.fase === 'const' && String(e.cerrado || '').slice(0, 7) === mes && e.asignado === p.id;
+    }).length;
+    if (n > maxP) maxP = n;
+    return { n: p.n, v: n };
+  });
+  h += porP.map(function (x) {
+    return '<div class="rep"><span class="rep-n">' + esc(x.n) + '</span>' +
+      '<span class="rep-b"><i style="width:' + Math.round(x.v / maxP * 100) + '%"></i></span>' +
+      '<span class="rep-v">' + x.v + '</span></div>';
+  }).join('') + '</div></div>';
+
+  h += '<div class="caja"><div class="caja-cab"><h2 class="caja-t">Últimos seis meses</h2></div><div class="reparto">';
+  var ahora = new Date(hoy() + 'T00:00:00'), maxM = 1, ms = [];
+  for (var i = 5; i >= 0; i--) {
+    var d = new Date(ahora.getFullYear(), ahora.getMonth() - i, 1);
+    var k = d.getFullYear() + '-' + pad(d.getMonth() + 1);
+    var r = informeMes(k);
+    if (r.facturado > maxM) maxM = r.facturado;
+    ms.push({ n: MESES_C[d.getMonth()] + ' ' + String(d.getFullYear()).slice(2), v: r.facturado });
+  }
+  h += ms.map(function (x) {
+    return '<div class="rep"><span class="rep-n">' + esc(x.n) + '</span>' +
+      '<span class="rep-b"><i style="width:' + Math.round(x.v / maxM * 100) + '%"></i></span>' +
+      '<span class="rep-v">' + esc(x.v ? euros(x.v) : '—') + '</span></div>';
+  }).join('') + '</div></div></div>';
+
+  h += '<p class="pista" style="margin-top:14px">Todo sale de los datos: altas por fecha de alta, ' +
+    'constituciones por fecha de cierre, facturado por fecha de factura.</p>';
+  return h + '</div>';
+}
+
+function informeMes(mes) {
+  var cs = datos.clientes.filter(function (c) { return String(c.creado || '').slice(0, 7) === mes; });
+  var fs = datos.facturas.filter(function (f) {
+    return f.estado !== 'anulada' && String(f.fecha || '').slice(0, 7) === mes;
+  });
+  return {
+    clientes: cs.length,
+    ganados: cs.filter(function (c) { return c.estado === 'ganado'; }).length,
+    constituidas: datos.expedientes.filter(function (e) {
+      return e.fase === 'const' && String(e.cerrado || '').slice(0, 7) === mes;
+    }).length,
+    abiertas: expAbiertos().length,
+    facturado: fs.reduce(function (s, f) { return s + totalFactura(f); }, 0),
+    cobrado: fs.filter(function (f) { return f.estado === 'cobrada'; })
+                .reduce(function (s, f) { return s + totalFactura(f); }, 0),
+    nFacturas: fs.length
+  };
+}
+
+/* -- Notas ----------------------------------------------------- */
+
+var I_NOTA = '<svg viewBox="0 0 24 24"><path d="M4 5.4A1.4 1.4 0 0 1 5.4 4h13.2A1.4 1.4 0 0 1 20 5.4v10L15 20H5.4A1.4 1.4 0 0 1 4 18.6Z"/><path d="M20 15h-3.6a1.4 1.4 0 0 0-1.4 1.4V20"/><path d="M7.6 8.6h8.8M7.6 12h5.4"/></svg>';
+
+function vNotas() {
+  var h = '<div class="vista">' + cab('Notas', 'La pizarra del equipo: lo que hay que recordar y no es una tarea',
+    '<button class="btn btn-tinta btn-sm" data-nuevo="nota">' + I_MAS + '<span>Nueva nota</span></button>');
+
+  if (!datos.notas.length) {
+    return h + vacio(I_NOTA, 'La pizarra está limpia',
+      'Para lo que no cabe en una ficha ni tiene fecha: un criterio acordado, un aviso del registro de un país, algo que hay que revisar cuando toque.',
+      '<button class="btn btn-tinta" data-nuevo="nota">' + I_MAS + '<span>Nueva nota</span></button>') + '</div>';
+  }
+
+  var lista = datos.notas.slice().sort(function (a, b) {
+    if (!!a.hecha !== !!b.hecha) return a.hecha ? 1 : -1;
+    return String(b.creado || '').localeCompare(String(a.creado || ''));
+  });
+
+  h += '<div class="tabla">' + lista.map(function (n) {
+    return '<div class="fila' + (n.hecha ? ' hecha' : '') + '">' +
+      '<button class="marcar" data-nota-hecha="' + esc(n.id) + '" aria-pressed="' + (n.hecha ? 'true' : 'false') +
+        '" aria-label="Marcar como resuelta"><svg viewBox="0 0 16 16"><path d="m3 8.5 3.2 3.2L13 5"/></svg></button>' +
+      '<button class="fila-c" data-ficha="nota" data-id="' + esc(n.id) + '">' +
+        '<span class="fila-t">' + esc(n.titulo) + '</span>' +
+        '<span class="fila-s">' + esc(nombrePersona(n.quien) || '') +
+        (n.creado ? ' &middot; ' + esc(fechaCorta(n.creado)) : '') + '</span></button>' +
+      (n.etiqueta ? pill(n.etiqueta) : '') + '</div>';
+  }).join('') + '</div></div>';
+  return h;
+}
+
+/* -- Enlaces --------------------------------------------------- */
+
+var I_ENL = '<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 6 .5l2.5-2.5a4 4 0 0 0-5.7-5.7L11.5 7.6"/><path d="M14 10a4 4 0 0 0-6-.5L5.5 12a4 4 0 0 0 5.7 5.7l1.3-1.3"/></svg>';
+
+function vEnlaces() {
+  var h = '<div class="vista">' + cab('Enlaces', 'Los sitios a los que entra el equipo todos los días',
+    '<button class="btn btn-tinta btn-sm" data-nuevo="enlace">' + I_MAS + '<span>Nuevo enlace</span></button>');
+
+  if (!datos.enlaces.length) {
+    return h + vacio(I_ENL, 'Ningún enlace guardado',
+      'Registros mercantiles, formularios de cada país, la carpeta de plantillas. Lo que ahora está en un marcador de alguien y nadie más encuentra.',
+      '<button class="btn btn-tinta" data-nuevo="enlace">' + I_MAS + '<span>Nuevo enlace</span></button>') + '</div>';
+  }
+
+  var grupos = {};
+  datos.enlaces.forEach(function (e) {
+    var g = e.grupo || 'General';
+    (grupos[g] = grupos[g] || []).push(e);
+  });
+
+  Object.keys(grupos).sort().forEach(function (g) {
+    h += '<p class="bloque-t" style="margin:22px 0 10px">' + esc(g) + '</p><div class="paises">';
+    h += grupos[g].map(function (e) {
+      var u = urlSegura(e.url);
+      var host = '';
+      try { host = u ? new URL(u).hostname.replace(/^www\./, '') : ''; } catch (x) {}
+      return '<div class="pais">' +
+        '<div class="pais-cab"><span class="pais-n">' + esc(e.nombre) + '</span>' +
+        '<button class="btn btn-plano btn-sm" data-editar="enlace" data-id="' + esc(e.id) + '">Editar</button></div>' +
+        (e.nota ? '<p class="pais-d" style="margin:0 0 12px">' + esc(e.nota) + '</p>' : '') +
+        (u ? '<a class="btn btn-suave btn-sm" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' +
+             esc(host || 'Abrir') + '</a>'
+           : '<p class="pista">Sin dirección válida</p>') +
+      '</div>';
+    }).join('') + '</div>';
+  });
+  return h + '</div>';
+}
+
+/* -- Actividad ------------------------------------------------- */
+
+function vActividad() {
+  var h = '<div class="vista">' + cab('Actividad', 'Todo lo que ha pasado, y quién lo hizo', '');
+
+  if (!datos.actividad.length) {
+    return h + vacio('<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+      'Sin movimiento todavía',
+      'Aquí se apunta solo lo que hagáis vosotros: altas, cambios de fase, cobros y cierres. Nada automático.') + '</div>';
+  }
+
+  var porDia = {};
+  datos.actividad.forEach(function (a) {
+    var k = String(a.fecha || '').slice(0, 10);
+    (porDia[k] = porDia[k] || []).push(a);
+  });
+
+  Object.keys(porDia).sort().reverse().slice(0, 30).forEach(function (k) {
+    h += '<p class="bloque-t" style="margin:22px 0 10px">' + esc(fechaCorta(k)) + '</p>' +
+      '<div class="tabla">' + porDia[k].map(function (a) {
+        return '<div class="fila"><span class="ini ini-sm">' + esc(iniciales(nombrePersona(a.quien) || '?')) + '</span>' +
+          '<span class="fila-c"><span class="fila-t">' + esc(a.texto) + '</span>' +
+          '<span class="fila-s">' + esc(nombrePersona(a.quien) || 'sin firmar') + '</span></span></div>';
+      }).join('') + '</div>';
+  });
+  return h + '</div>';
+}
+
+function fNota(x) {
+  var n = nota(x);
+  if (!n) return '';
+  var h = cabFicha(n.titulo, esc((nombrePersona(n.quien) || '') + (n.creado ? ' · ' + fechaCorta(n.creado) : '')));
+  h += '<div class="cajon-cuerpo">';
+  if (n.etiqueta) h += '<div class="bloque"><p class="bloque-t">Etiqueta</p>' + pill(n.etiqueta) + '</div>';
+  if (n.texto) h += '<div class="bloque"><p class="bloque-t">Nota</p><p class="nota">' + esc(n.texto) + '</p></div>';
+  return h + '</div><div class="cajon-pie">' +
+    '<button class="btn btn-suave btn-sm" data-editar="nota" data-id="' + esc(n.id) + '">Editar</button>' +
+    '<button class="btn btn-peligro btn-sm" data-borrar="nota" data-id="' + esc(n.id) + '">Eliminar</button></div>';
+}
+
 /* -- Ficha lateral --------------------------------------------- */
 
 function abreFicha(tipo, oid) {
   var mapa = { cliente: fCliente, contacto: fContacto, expediente: fExpediente,
                tarea: fTarea, llamada: fLlamada, factura: fFactura,
-               documento: fDocumento, objetivo: fObjetivo };
+               documento: fDocumento, objetivo: fObjetivo, nota: fNota };
   var h = mapa[tipo] ? mapa[tipo](oid) : '';
   if (!h) return;
   var c = $('#cajon');
@@ -1460,6 +1667,20 @@ function abreForm(tipo, oid, pre) {
       '<p class="pista">Lo logrado no se teclea: sale de las constituciones cerradas o de las facturas ' +
       'cobradas ese mes.</p>';
 
+  } else if (tipo === 'nota') {
+    titulo = reg ? 'Editar nota' : 'Nueva nota';
+    cuerpo = campo('titulo', 'Qué hay que recordar *', r.titulo, 'text', ' required autocomplete="off"') +
+      campo('etiqueta', 'Etiqueta', r.etiqueta, 'text', ' placeholder="Portugal, notaría, criterio…"') +
+      area('texto', 'Detalle', r.texto);
+
+  } else if (tipo === 'enlace') {
+    titulo = reg ? 'Editar enlace' : 'Nuevo enlace';
+    cuerpo = campo('nombre', 'Nombre *', r.nombre, 'text', ' required autocomplete="off"') +
+      campo('url', 'Dirección *', r.url, 'text', ' autocomplete="off" placeholder="registro.example.com"') +
+      '<div class="campo-2">' + campo('grupo', 'Grupo', r.grupo, 'text', ' placeholder="Registros, Plantillas…"') +
+        campo('nota', 'Para qué', r.nota) + '</div>' +
+      '<p class="pista">Solo se aceptan direcciones http y https.</p>';
+
   } else if (tipo === 'llamada') {
     titulo = reg ? 'Editar llamada' : 'Anotar llamada';
     cuerpo = sel('clienteId', 'Cliente *', opcCliente(r.clienteId || p.clienteId)) +
@@ -1577,6 +1798,18 @@ function envia(tipo, reg, fd) {
       registra('Objetivo de ' + (nombrePersona(r.personaId) || 'el equipo') + ' para ' + r.mes);
     }
 
+  } else if (tipo === 'nota') {
+    if (!v('titulo')) return error('La nota necesita al menos un título.');
+    r.titulo = v('titulo'); r.etiqueta = v('etiqueta'); r.texto = v('texto');
+    if (nuevo) { r.hecha = false; r.quien = datos.yo; datos.notas.push(r); }
+
+  } else if (tipo === 'enlace') {
+    if (!v('nombre')) return error('El enlace necesita un nombre.');
+    var u = urlSegura(v('url'));
+    if (!u) return error('Esa dirección no vale: solo se aceptan http y https.');
+    r.nombre = v('nombre'); r.url = u; r.grupo = v('grupo') || 'General'; r.nota = v('nota');
+    if (nuevo) { datos.enlaces.push(r); registra('Nuevo enlace: ' + r.nombre); }
+
   } else if (tipo === 'llamada') {
     if (!v('clienteId')) return error('La llamada necesita un cliente.');
     if (!v('resumen')) return error('Apunta en qué quedasteis, aunque sea en cinco palabras.');
@@ -1598,7 +1831,8 @@ function envia(tipo, reg, fd) {
 function borra(tipo, oid) {
   var listas = { cliente: datos.clientes, contacto: datos.contactos, expediente: datos.expedientes,
                  tarea: datos.tareas, llamada: datos.llamadas, factura: datos.facturas,
-                 documento: datos.documentos, objetivo: datos.objetivos };
+                 documento: datos.documentos, objetivo: datos.objetivos,
+                 nota: datos.notas, enlace: datos.enlaces };
   var lista = listas[tipo];
   if (!lista) return;
   var i = -1;
@@ -1684,6 +1918,16 @@ function exportaCsv(cual) {
     datos.tareas.forEach(function (t) {
       filas.push([t.titulo, tipoTarea(t.tipo).n, t.vence, t.hecha ? 'sí' : 'no', nombreCliente(t.clienteId), t.notas]);
     });
+  } else if (cual === 'informe') {
+    filas.push(['Mes', 'Altas', 'Ganados', 'Constituidas', 'Facturado', 'Cobrado', 'Facturas']);
+    var ahora = new Date(hoy() + 'T00:00:00');
+    for (var m = 11; m >= 0; m--) {
+      var dd = new Date(ahora.getFullYear(), ahora.getMonth() - m, 1);
+      var k = dd.getFullYear() + '-' + pad(dd.getMonth() + 1);
+      var r2 = informeMes(k);
+      filas.push([k, r2.clientes, r2.ganados, r2.constituidas, r2.facturado, r2.cobrado, r2.nFacturas]);
+    }
+
   } else {
     filas.push(['Cliente', 'Fecha', 'Minutos', 'Resumen', 'Notas']);
     datos.llamadas.forEach(function (l) {
@@ -1781,6 +2025,11 @@ document.addEventListener('click', function (ev) {
   if ((e = t.closest('[data-cobro]'))) { mueveCobro(e.dataset.cobro, e.dataset.valor); return; }
   if ((e = t.closest('[data-estdoc]'))) { mueveDoc(e.dataset.estdoc, e.dataset.valor); return; }
   if ((e = t.closest('[data-valida]'))) { ev.stopPropagation(); mueveDoc(e.dataset.valida, 'validado'); return; }
+  if ((e = t.closest('[data-nota-hecha]'))) {
+    var nn = nota(e.dataset.notaHecha);
+    if (nn) { nn.hecha = !nn.hecha; guardar(); pinta(); }
+    return;
+  }
   if ((e = t.closest('[data-estado]'))) { cambiaEstado(e.dataset.estado, e.dataset.valor); return; }
   if ((e = t.closest('[data-precio]'))) { ponPrecio(e.dataset.precio); return; }
 
