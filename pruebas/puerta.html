@@ -1,0 +1,59 @@
+<!doctype html><meta charset="utf-8">
+<script>
+window.__enLocal = ['localhost', '127.0.0.1', ''].indexOf(location.hostname) >= 0;
+if (!window.__enLocal) {
+  document.addEventListener('DOMContentLoaded', function () {
+    document.body.setAttribute('style', 'font:15px/1.6 system-ui;padding:40px;max-width:32em');
+    document.body.innerHTML = '<h1 style="font-size:20px">Banco de pruebas</h1>' +
+      '<p>Solo funciona en local.</p><p><a href="/">Ir al CRM</a></p>';
+  });
+}
+</script>
+<title>banco de pruebas de la puerta</title>
+<link rel="stylesheet" href="../assets/app.css">
+<div class="acceso" id="acceso" hidden></div>
+<p id="estado" style="font:13px ui-monospace,monospace;padding:16px">preparando…</p>
+<script>
+/* Banco de pruebas de la puerta.
+ *
+ * La aplicación de verdad lee las credenciales de assets/equipo.js, que
+ * se publica con ella. Aquí no se puede tocar ese fichero desde el
+ * navegador, así que se calcula al vuelo el hash de una contraseña de
+ * prueba y se publica en el mismo global. Es exactamente lo que haría
+ * equipo.js, pero sin necesidad de escribir nada en disco.
+ *
+ * No hay ninguna credencial real en este fichero: la contraseña de
+ * prueba está a la vista aquí abajo porque es de mentira.
+ */
+if (window.__enLocal) (async function () {
+  const CLAVE = 'contrasena-de-prueba-larga';
+  const VUELTAS = 250000;
+  const hex = b => Array.from(new Uint8Array(b)).map(x => ('0' + x.toString(16)).slice(-2)).join('');
+
+  const sal = crypto.getRandomValues(new Uint8Array(16));
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(CLAVE), 'PBKDF2', false, ['deriveBits']);
+  const hash = hex(await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt: sal, iterations: VUELTAS, hash: 'SHA-256' }, k, 256));
+
+  window.FILNET_ACCESOS = {
+    ana: { sal: hex(sal.buffer), hash: hash }
+    /* 'ben' aparece en el equipo pero NO aquí: sirve para comprobar que
+       quien no está publicado no puede ni elegirse. */
+  };
+  window.__CLAVE_PRUEBA = CLAVE;
+
+  const s = document.createElement('script');
+  s.src = '../assets/acceso.js';
+  s.onload = function () {
+    window.Acceso.exige(
+      [{ id: 'ana', n: 'Ana' }, { id: 'ben', n: 'Ben' }],
+      function (pid) {
+        document.getElementById('estado').textContent = 'dentro: ' + pid;
+        document.title = 'dentro';
+      }
+    );
+    document.getElementById('estado').textContent = 'puerta lista';
+  };
+  document.head.appendChild(s);
+})();
+</script>

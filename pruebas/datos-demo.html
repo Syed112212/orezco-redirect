@@ -1,64 +1,99 @@
 <!doctype html><meta charset="utf-8">
 <script>
-/* Estas paginas escriben y borran el almacen del navegador. Fuera de local
-   no deben ejecutarse nunca. Ojo: NO vale reemplazar documentElement aqui
-   -- el parser sigue anadiendo el resto del documento despues y las pruebas
-   acababan corriendo igual en produccion. Se marca una bandera y cada
-   script decide, ya con el DOM montado. */
+/* Estas páginas escriben y borran el almacén del navegador. Fuera de local
+   no deben ejecutarse nunca. Ojo: NO vale reemplazar documentElement aquí
+   — el parser sigue añadiendo el resto del documento después y el script
+   acabaría corriendo igual. Se marca una bandera y cada página decide,
+   ya con el DOM montado. */
 window.__enLocal = ['localhost', '127.0.0.1', ''].indexOf(location.hostname) >= 0;
 window.__avisaFuera = function () {
   document.addEventListener('DOMContentLoaded', function () {
-    document.body.setAttribute('style', 'font:15px/1.6 system-ui;padding:40px;max-width:32em;background:#fafffa;color:#121613');
+    document.body.setAttribute('style', 'font:15px/1.6 system-ui;padding:40px;max-width:32em;background:#f6f6f8;color:#1f1f1f');
     document.body.innerHTML =
       '<h1 style="font-size:20px;margin:0 0 12px">Página de pruebas</h1>' +
       '<p style="margin:0 0 12px">Solo funciona sirviendo el proyecto en local. ' +
       'Escribe y borra el almacén del navegador, así que aquí se queda parada a propósito.</p>' +
-      '<p style="margin:0"><a href="/" style="color:#17a832">Ir al CRM</a></p>';
+      '<p style="margin:0"><a href="/" style="color:#1f1f1f">Ir al CRM</a></p>';
   });
 };
 </script>
-<title>seed</title>
+<title>datos de demostración</title>
 <script>
-// Fichero de prueba local. No se publica: se borra antes del commit.
 if (!window.__enLocal) { window.__avisaFuera(); } else {
+
 var hoy = new Date();
-function d(n){var x=new Date(hoy);x.setDate(x.getDate()+n);return x.toISOString().slice(0,10);}
-localStorage.setItem('orezco.crm.v1', JSON.stringify({
- v:1,
- empresas:[
-  {id:'e1',nombre:'Talleres Marbán',nif:'B12345678',sector:'Automoción',estado:'cliente',tel:'963 112 233',email:'admin@marban.example',ciudad:'Valencia',web:'https://marban.example',notas:'Facturan a 60 días.\nPreguntar por la ampliación del taller 2.'},
-  {id:'e2',nombre:'Distribuciones Ávila e Hijos',nif:'B87654321',sector:'Alimentación',estado:'lead',tel:'915 004 411',email:'compras@avila.example',ciudad:'Madrid'},
-  {id:'e3',nombre:'Nortec Ingeniería',sector:'Industrial',estado:'cliente',ciudad:'Bilbao',email:'info@nortec.example'},
-  {id:'e4',nombre:'Cerámicas del Sur',sector:'Construcción',estado:'inactivo',ciudad:'Sevilla'}
- ],
- contactos:[
-  {id:'c1',nombre:'Rosa Marbán',cargo:'Administración',empresaId:'e1',email:'rosa@marban.example',tel:'600 111 222'},
-  {id:'c2',nombre:'Íñigo Aramburu',cargo:'Director de compras',empresaId:'e2',email:'inigo@avila.example'},
-  {id:'c3',nombre:'Chelo Ferrán',cargo:'Gerente',empresaId:'e3',tel:'944 556 677'}
- ],
- oportunidades:[
-  {id:'o1',titulo:'Renovación de 12 licencias',empresaId:'e1',valor:8400,etapa:'negociacion',cierre:d(14),notas:'Piden descuento por volumen.'},
-  {id:'o2',titulo:'Implantación inicial',empresaId:'e2',valor:15200,etapa:'propuesta',cierre:d(30)},
-  {id:'o3',titulo:'Módulo de inventario',empresaId:'e3',valor:4300,etapa:'cualificada',cierre:d(45)},
-  {id:'o4',titulo:'Migración desde hoja de cálculo',empresaId:'e1',valor:2600,etapa:'contacto'},
-  {id:'o5',titulo:'Ampliación a 3 sedes',empresaId:'e3',valor:11000,etapa:'ganada',cerrado:d(-3)},
-  {id:'o6',titulo:'Piloto de 6 meses',empresaId:'e4',valor:3200,etapa:'perdida',cerrado:d(-20)}
- ],
- tareas:[
-  {id:'t1',titulo:'Llamar a Rosa por el descuento',tipo:'llamada',vence:d(-2),hecha:false,empresaId:'e1'},
-  {id:'t2',titulo:'Enviar la propuesta revisada',tipo:'email',vence:d(0),hecha:false,empresaId:'e2'},
-  {id:'t3',titulo:'Reunión de arranque',tipo:'reunion',vence:d(3),hecha:false,empresaId:'e3'},
-  {id:'t4',titulo:'Preparar comparativa de precios',tipo:'tarea',vence:d(9),hecha:false,empresaId:'e2'},
-  {id:'t5',titulo:'Confirmar los datos fiscales',tipo:'tarea',vence:d(-6),hecha:true,empresaId:'e1'}
- ],
- actividad:[
-  {id:'a1',fecha:new Date().toISOString(),texto:'Ampliación a 3 sedes: Negociacion -> Ganada',ref:'o5'},
-  {id:'a2',fecha:new Date().toISOString(),texto:'Alta de Distribuciones Ávila e Hijos',ref:'e2'},
-  {id:'a3',fecha:new Date().toISOString(),texto:'Nueva oportunidad: Implantación inicial',ref:'o2'}
- ]
+function d(n) { var x = new Date(hoy); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); }
+function m(n) { var x = new Date(hoy.getFullYear(), hoy.getMonth() + n, 12); return x.toISOString().slice(0, 10); }
+
+localStorage.setItem('filnet.erp.v1', JSON.stringify({
+  v: 1,
+  yo: 'carlos',
+  precios: { uk: 1199, es: 1490, pt: 1350, ad: 2400, ae: 3200 },
+  clientes: [
+    { id: 'c1', nombre: 'Marta Ibáñez', empresa: 'Nordika Studio', email: 'marta@nordika.example', tel: '+34 611 220 044', pais: 'pt', origen: 'Web', estado: 'cont', prioridad: 'alta', creado: d(-22), asignado: 'carlos', notas: 'Quiere facturar a clientes de la UE desde Lisboa.\nPide comparar con Andorra.' },
+    { id: 'c2', nombre: 'Deniz Arslan', empresa: 'Arslan Trading', email: 'deniz@arslan.example', tel: '+34 655 118 902', pais: 'ae', origen: 'Recomendación', estado: 'reinc', prioridad: 'urgente', creado: d(-40), asignado: 'victor' },
+    { id: 'c3', nombre: 'Hugo Ferreira', empresa: 'Beluga Foods', email: 'hugo@beluga.example', tel: '+351 912 004 118', pais: 'es', origen: 'Campaña', estado: 'ganado', prioridad: 'media', creado: d(-61), asignado: 'syed' },
+    { id: 'c4', nombre: 'Aïcha Benali', empresa: 'Sabor Norte', email: 'aicha@sabornorte.example', tel: '+33 6 12 88 44 02', pais: 'uk', origen: 'LinkedIn', estado: 'sin', prioridad: 'baja', creado: d(-3), asignado: 'arnau' },
+    { id: 'c5', nombre: 'Óscar Prats', empresa: 'Prats & Vila', email: 'oscar@pratsvila.example', tel: '+376 33 44 55', pais: 'ad', origen: 'Web', estado: 'cont', prioridad: 'media', creado: d(-9), asignado: 'ramon' },
+    { id: 'c6', nombre: 'Lena Fischer', empresa: 'Halden GmbH', email: 'lena@halden.example', pais: 'es', origen: 'Web', estado: 'perd', prioridad: 'baja', creado: d(-75), asignado: 'syed' }
+  ],
+  contactos: [
+    { id: 'k1', nombre: 'Marta Ibáñez', cargo: 'Fundadora', clienteId: 'c1', email: 'marta@nordika.example', tel: '+34 611 220 044' },
+    { id: 'k2', nombre: 'Rubén Otxoa', cargo: 'Asesor fiscal', clienteId: 'c1', email: 'ruben@nordika.example' },
+    { id: 'k3', nombre: 'Deniz Arslan', cargo: 'Administrador', clienteId: 'c2', tel: '+34 655 118 902' },
+    { id: 'k4', nombre: 'Hugo Ferreira', cargo: 'CEO', clienteId: 'c3', email: 'hugo@beluga.example' }
+  ],
+  expedientes: [
+    { id: 'e1', clienteId: 'c1', pais: 'pt', ref: 'PT-2026-014', importe: 1350, fase: 'doc', abierto: d(-18), asignado: 'carlos' },
+    { id: 'e2', clienteId: 'c2', pais: 'ae', ref: 'AE-2026-007', importe: 3200, fase: 'firma', abierto: d(-31), asignado: 'victor' },
+    { id: 'e3', clienteId: 'c3', pais: 'es', ref: 'ES-2026-051', importe: 1490, fase: 'const', abierto: d(-58), cerrado: d(-6), asignado: 'syed' },
+    { id: 'e4', clienteId: 'c5', pais: 'ad', ref: 'AD-2026-003', importe: 2400, fase: 'reg', abierto: m(-1), asignado: 'ramon' },
+    { id: 'e5', clienteId: 'c1', pais: 'ad', ref: 'AD-2026-005', importe: 2400, fase: 'doc', abierto: d(-4), asignado: 'carlos' },
+    { id: 'e6', clienteId: 'c6', pais: 'es', ref: 'ES-2026-044', importe: 1490, fase: 'cancel', abierto: m(-2), cerrado: d(-40), asignado: 'syed' },
+    { id: 'e7', clienteId: 'c3', pais: 'uk', ref: 'UK-2026-021', importe: 1199, fase: 'const', abierto: m(-3), cerrado: m(-2) }
+  ],
+  tareas: [
+    { id: 't1', titulo: 'Pedir el pasaporte compulsado a Deniz', tipo: 'doc', vence: d(-2), hecha: false, clienteId: 'c2' },
+    { id: 't2', titulo: 'Llamar a Marta con la comparativa PT / AD', tipo: 'llamada', vence: d(0), hecha: false, clienteId: 'c1' },
+    { id: 't3', titulo: 'Firma en notaría', tipo: 'reunion', vence: d(4), hecha: false, clienteId: 'c5' },
+    { id: 't4', titulo: 'Enviar propuesta a Aïcha', tipo: 'email', vence: d(2), hecha: false, clienteId: 'c4' },
+    { id: 't5', titulo: 'Revisar el registro mercantil de Andorra', tipo: 'tarea', vence: d(11), hecha: false, clienteId: 'c5' },
+    { id: 't6', titulo: 'Mandar el certificado a Hugo', tipo: 'email', vence: d(-8), hecha: true, clienteId: 'c3' }
+  ],
+  llamadas: [
+    { id: 'l1', clienteId: 'c1', fecha: d(-5), minutos: 18, resumen: 'Compara Portugal con Andorra; le preocupa la residencia fiscal.' },
+    { id: 'l2', clienteId: 'c2', fecha: d(-12), minutos: 9, resumen: 'Falta documentación; vuelve a llamar en dos semanas.' },
+    { id: 'l3', clienteId: 'c5', fecha: d(-1), minutos: 24, resumen: 'Confirmada la fecha de notaría.' }
+  ],
+  facturas: [
+    { id: 'f1', clienteId: 'c3', expedienteId: 'e3', numero: '2026-041', base: 1231, iva: 259, fecha: d(-6), vence: d(24), estado: 'emitida' },
+    { id: 'f2', clienteId: 'c3', expedienteId: 'e7', numero: '2026-018', base: 991, iva: 208, fecha: m(-2), vence: m(-1), estado: 'cobrada', cobrada: m(-1) },
+    { id: 'f3', clienteId: 'c5', expedienteId: 'e4', numero: '2026-039', base: 1200, iva: 0, fecha: d(-34), vence: d(-4), estado: 'emitida' },
+    { id: 'f4', clienteId: 'c2', expedienteId: 'e2', numero: '2026-044', base: 1600, iva: 0, fecha: d(-12), vence: d(18), estado: 'emitida' },
+    { id: 'f5', clienteId: 'c6', numero: '2026-030', base: 1231, iva: 259, fecha: m(-2), vence: m(-1), estado: 'anulada' }
+  ],
+  documentos: [
+    { id: 'd1', expedienteId: 'e2', tipo: 'pasaporte', estado: 'pedido', pedido: d(-9), nota: 'Compulsado, se lo pedí a Deniz por email' },
+    { id: 'd2', expedienteId: 'e2', tipo: 'domicilio', estado: 'recibido', pedido: d(-14), recibido: d(-3) },
+    { id: 'd3', expedienteId: 'e1', tipo: 'estatutos', estado: 'validado', pedido: d(-16), recibido: d(-10) },
+    { id: 'd4', expedienteId: 'e1', tipo: 'titular', estado: 'rechazado', pedido: d(-16), recibido: d(-8), nota: 'Falta la firma del segundo socio' },
+    { id: 'd5', expedienteId: 'e4', tipo: 'poder', estado: 'pedido', pedido: d(-5) },
+    { id: 'd6', expedienteId: 'e4', tipo: 'banco', estado: 'validado', pedido: m(-1), recibido: d(-11) },
+    { id: 'd7', expedienteId: 'e5', tipo: 'pasaporte', estado: 'pedido', pedido: d(-4) }
+  ],
+  objetivos: [
+    { id: 'o1', personaId: 'carlos', tipo: 'expedientes', meta: 4, mes: new Date().toISOString().slice(0,7) },
+    { id: 'o2', personaId: 'syed', tipo: 'importe', meta: 6000, mes: new Date().toISOString().slice(0,7) },
+    { id: 'o3', personaId: '', tipo: 'expedientes', meta: 9, mes: new Date().toISOString().slice(0,7) }
+  ],
+  actividad: [
+    { id: 'a1', quien: 'carlos', fecha: new Date().toISOString(), texto: 'Óscar Prats: Firma → Registro' },
+    { id: 'a2', quien: 'carlos', fecha: new Date().toISOString(), texto: 'Nuevo expediente: Marta Ibáñez → Andorra' },
+    { id: 'a3', quien: 'carlos', fecha: new Date().toISOString(), texto: 'Alta de Aïcha Benali' },
+    { id: 'a4', quien: 'carlos', fecha: new Date().toISOString(), texto: 'Hugo Ferreira: Registro → Constituida' }
+  ]
 }));
 document.title = 'listo';
-
 }
 </script>
-<p>Datos de prueba cargados.
+<p>Datos de demostración cargados. <a href="/">Ir al CRM</a>

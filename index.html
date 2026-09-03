@@ -3,84 +3,114 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Orezco — CRM</title>
-<meta name="description" content="Orezco es un CRM sencillo: empresas, contactos, oportunidades y tareas en un embudo que se entiende de un vistazo.">
-<meta name="robots" content="noindex, follow">
+<title>Filnet — CRM</title>
+<meta name="description" content="CRM interno de Filnet: clientes, expedientes de constitución, países y precios, tareas y calendario.">
+<meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="light">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="assets/app.css?v=7">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="assets/app.css?v=5">
 <link rel="icon" href="assets/marca.svg" type="image/svg+xml">
 </head>
 <body>
+
+<!-- ── Puerta de acceso ────────────────────────────────────── -->
+<div class="acceso" id="acceso" hidden></div>
 
 <a class="saltar" href="#principal">Saltar al contenido</a>
 
 <!-- ── Barra lateral ───────────────────────────────────────── -->
 <aside class="lateral" id="lateral">
-  <div class="lateral-marca">
-    <svg class="marca" viewBox="0 0 200 200" role="img" aria-label="Orezco">
-      <polygon points="100,26 166,63 166,137 100,174 34,137 34,63"
-               fill="currentColor" stroke="currentColor" stroke-width="26" stroke-linejoin="round"/>
-      <g stroke="var(--logo-bg)" stroke-width="13" stroke-linecap="round" fill="none">
-        <path d="M100 100 L38 64"/><path d="M100 100 L162 64"/><path d="M100 100 L100 172"/>
-      </g>
-      <g stroke="currentColor" stroke-width="15" stroke-linecap="round">
-        <path d="M100 44 L100 156"/><path d="M51.5 72 L148.5 128"/><path d="M51.5 128 L148.5 72"/>
-      </g>
-    </svg>
-    <span class="lateral-nombre">Orezco</span>
+
+  <div class="espacio">
+    <span class="espacio-icono" aria-hidden="true">
+      <svg viewBox="0 0 20 20"><path d="M3 17V5.2A1.2 1.2 0 0 1 4.2 4h5.6A1.2 1.2 0 0 1 11 5.2V17"/><path d="M11 17V9.5h4.3A1.2 1.2 0 0 1 16.5 10.7V17"/><path d="M2 17h16"/><path d="M5.5 7h3M5.5 10h3M5.5 13h3"/></svg>
+    </span>
+    <span class="espacio-txt">
+      <b>Filnet</b>
+      <em>Espacio CRM</em>
+    </span>
+    <svg class="chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6.5 4 4 4-4"/></svg>
   </div>
 
-  <nav class="lateral-nav" aria-label="Secciones">
-    <button class="nav-i" data-vista="panel" aria-current="page">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="2.5" width="6.5" height="6.5" rx="1.5"/><rect x="11" y="2.5" width="6.5" height="4" rx="1.5"/><rect x="11" y="8.5" width="6.5" height="9" rx="1.5"/><rect x="2.5" y="11" width="6.5" height="6.5" rx="1.5"/></svg>
+  <button class="avisos" id="avisos">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3a4.5 4.5 0 0 1 4.5 4.5c0 3.2 1 4.3 1.5 4.9H4c.5-.6 1.5-1.7 1.5-4.9A4.5 4.5 0 0 1 10 3Z"/><path d="M8.2 15.2a1.9 1.9 0 0 0 3.6 0"/></svg>
+    <span>Notificaciones</span>
+    <em class="avisos-n" id="avisosN">0</em>
+    <svg class="chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6.5 4 4 4-4"/></svg>
+  </button>
+
+  <nav class="menu" aria-label="Secciones">
+
+    <p class="menu-g">General</p>
+    <button class="mi" data-vista="panel" aria-current="page">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="2.5" width="6.5" height="6.5" rx="1.6"/><rect x="11" y="2.5" width="6.5" height="6.5" rx="1.6"/><rect x="2.5" y="11" width="6.5" height="6.5" rx="1.6"/><rect x="11" y="11" width="6.5" height="6.5" rx="1.6"/></svg>
       <span>Panel</span></button>
-    <button class="nav-i" data-vista="embudo">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3" width="4" height="14" rx="1.5"/><rect x="8" y="3" width="4" height="10" rx="1.5"/><rect x="13.5" y="3" width="4" height="6" rx="1.5"/></svg>
-      <span>Embudo</span><em class="nav-n" data-cuenta="oportunidades"></em></button>
-    <button class="nav-i" data-vista="empresas">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 17V5.5a1.5 1.5 0 0 1 1.5-1.5h5A1.5 1.5 0 0 1 11 5.5V17"/><path d="M11 17V9h4.5A1.5 1.5 0 0 1 17 10.5V17"/><path d="M2 17h16"/><path d="M5.5 7h3M5.5 10h3M5.5 13h3M13 12h1.5"/></svg>
-      <span>Empresas</span><em class="nav-n" data-cuenta="empresas"></em></button>
-    <button class="nav-i" data-vista="contactos">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="6.5" r="3"/><path d="M3.5 17a6.5 6.5 0 0 1 13 0"/></svg>
-      <span>Contactos</span><em class="nav-n" data-cuenta="contactos"></em></button>
-    <button class="nav-i" data-vista="tareas">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3.5" width="14" height="13.5" rx="2"/><path d="M3 7h14M6.5 2v3M13.5 2v3"/><path d="m7 12 2 2 4-4"/></svg>
-      <span>Tareas</span><em class="nav-n nav-n-alerta" data-cuenta="tareas"></em></button>
+    <button class="mi" data-vista="clientes">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7.5" cy="7" r="2.6"/><path d="M2.8 16a4.7 4.7 0 0 1 9.4 0"/><path d="M13.4 5.2a2.4 2.4 0 0 1 0 4.4"/><path d="M14.6 16h2.6a3.9 3.9 0 0 0-2.6-3.6"/></svg>
+      <span>Clientes</span><em class="mi-n" data-cuenta="clientes"></em></button>
+    <button class="mi" data-vista="contactos">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="3" width="14" height="14" rx="2.4"/><circle cx="10" cy="8.4" r="2.2"/><path d="M6.4 14.6a3.8 3.8 0 0 1 7.2 0"/></svg>
+      <span>Contactos</span><em class="mi-n" data-cuenta="contactos"></em></button>
+
+    <p class="menu-g">Trabajo</p>
+    <button class="mi" data-vista="expedientes">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 3.5h7l5 4.5v8.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-12a1 1 0 0 1 1-1Z"/><path d="M11 3.5V8h5"/><path d="M6.5 12h7M6.5 14.6h4.5"/></svg>
+      <span>Expedientes</span><em class="mi-n" data-cuenta="expedientes"></em></button>
+    <button class="mi" data-vista="paises">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.2"/><path d="M2.8 10h14.4"/><path d="M10 2.8c1.9 2 2.9 4.5 2.9 7.2s-1 5.2-2.9 7.2c-1.9-2-2.9-4.5-2.9-7.2s1-5.2 2.9-7.2Z"/></svg>
+      <span>Países y precios</span></button>
+    <button class="mi" data-vista="calculadora">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="4" y="2.6" width="12" height="14.8" rx="2.2"/><rect x="6.6" y="5.2" width="6.8" height="3" rx="1"/><path d="M7 11.4h.01M10 11.4h.01M13 11.4h.01M7 14.2h.01M10 14.2h.01M13 14.2h.01"/></svg>
+      <span>Calculadora</span></button>
+    <button class="mi" data-vista="facturacion">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 2.5h11v15l-2.2-1.4-2.2 1.4-2.1-1.4-2.2 1.4-2.3-1.4Z"/><path d="M7.4 6.6h5.2M7.4 9.6h5.2M7.4 12.6h3"/></svg>
+      <span>Facturación</span><em class="mi-n mi-n-alerta" data-cuenta="facturacion"></em></button>
+
+    <p class="menu-g">Equipo</p>
+    <button class="mi" data-vista="tareas">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="13" rx="2.2"/><path d="M3 7.6h14M6.8 2.4v3M13.2 2.4v3"/><path d="m7.4 12 1.9 1.9 3.6-3.7"/></svg>
+      <span>Tareas</span><em class="mi-n mi-n-alerta" data-cuenta="tareas"></em></button>
+    <button class="mi" data-vista="calendario">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="3" y="4" width="14" height="13" rx="2.2"/><path d="M3 8.4h14M6.8 2.4v3M13.2 2.4v3"/></svg>
+      <span>Calendario</span></button>
+    <button class="mi" data-vista="llamadas">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M6.3 3.2 8 6.1 6.4 7.9a9.4 9.4 0 0 0 5 5l1.8-1.6 2.9 1.7-.4 2.4a1.4 1.4 0 0 1-1.6 1.1C8.4 15.7 4.3 11.6 3 5.2a1.4 1.4 0 0 1 1.1-1.6Z"/></svg>
+      <span>Llamadas</span></button>
+    <button class="mi" data-vista="objetivos">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.2"/><circle cx="10" cy="10" r="3.9"/><circle cx="10" cy="10" r="1"/></svg>
+      <span>Objetivos</span></button>
+
+    <p class="menu-g">Herramientas</p>
+    <button class="mi" data-vista="documentos">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 3.5h6.5L16 8v8.5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-12a1 1 0 0 1 1-1Z"/><path d="M10.5 3.5V8H16"/><path d="m6.6 12.4 1.5 1.5 3-3"/></svg>
+      <span>Documentos</span><em class="mi-n mi-n-alerta" data-cuenta="documentos"></em></button>
+    <button class="mi" data-vista="canales">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 16.5V9M7.6 16.5V5M12.4 16.5v-8M17 16.5V11"/></svg>
+      <span>Canales</span></button>
+    <button class="mi" data-vista="usuarios">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="6.6" r="2.8"/><path d="M4.4 16.4a5.6 5.6 0 0 1 11.2 0"/><path d="M14.4 3.2a1.6 1.6 0 0 1 0 3.2"/></svg>
+      <span>Usuarios</span><em class="mi-n" data-cuenta="usuarios"></em></button>
+    <button class="mi" data-vista="ajustes">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="2.7"/><path d="M10 2.2v2M10 15.8v2M17.8 10h-2M4.2 10h-2M15.5 4.5l-1.4 1.4M5.9 14.1l-1.4 1.4M15.5 15.5l-1.4-1.4M5.9 5.9 4.5 4.5"/></svg>
+      <span>Ajustes</span></button>
   </nav>
 
-  <div class="lateral-pie">
-    <button class="nav-i nav-i-tenue" data-vista="ajustes">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="2.75"/><path d="M10 1.8v2M10 16.2v2M16.5 10h1.7M1.8 10h1.7M14.6 5.4l1.2-1.2M4.2 15.8l1.2-1.2M14.6 14.6l1.2 1.2M4.2 4.2l1.2 1.2"/></svg>
-      <span>Ajustes</span></button>
-    <p class="lateral-nota">Los datos se guardan en este navegador.<br><a href="#" data-ir="ajustes">Haz copia de seguridad</a></p>
-  </div>
+  <button class="yo" id="quienSoy" aria-label="Cambiar de persona">
+    <span class="ini ini-yo" id="yoIni">?</span>
+    <span class="yo-txt"><b id="yoNom">—</b><em>Cerrar sesión</em></span>
+    <svg class="chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6.5 4 4 4-4"/></svg>
+  </button>
 </aside>
 
 <div class="velo" id="velo" hidden></div>
 
 <!-- ── Contenido ───────────────────────────────────────────── -->
 <main id="principal" class="principal">
-
-  <header class="cabecera">
-    <button class="menu-movil" id="menuMovil" aria-label="Abrir el menú" aria-expanded="false">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14"/></svg>
-    </button>
-    <div class="buscador">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.75" cy="8.75" r="5.25"/><path d="m12.6 12.6 4 4"/></svg>
-      <input type="search" id="buscar" placeholder="Buscar empresas, contactos y oportunidades" aria-label="Buscar" autocomplete="off">
-      <kbd>/</kbd>
-    </div>
-    <button class="btn btn-verde" id="btnNuevo">
-      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>
-      <span>Nuevo</span>
-    </button>
-  </header>
-
-  <div id="resultados" class="resultados" hidden></div>
-
+  <button class="menu-movil" id="menuMovil" aria-label="Abrir el menú" aria-expanded="false">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5.5h14M3 10h14M3 14.5h14"/></svg>
+  </button>
   <div id="vistas"></div>
 </main>
 
@@ -93,6 +123,8 @@
 
 <div class="aviso" id="aviso" role="status" aria-live="polite" hidden></div>
 
+<script src="assets/equipo.js?v=1"></script>
+<script src="assets/acceso.js?v=2"></script>
 <script src="assets/app.js?v=7"></script>
 </body>
 </html>

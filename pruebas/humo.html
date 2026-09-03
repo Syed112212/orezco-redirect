@@ -1,180 +1,385 @@
 <!doctype html><meta charset="utf-8">
 <script>
-/* Estas paginas escriben y borran el almacen del navegador. Fuera de local
-   no deben ejecutarse nunca. Ojo: NO vale reemplazar documentElement aqui
-   -- el parser sigue anadiendo el resto del documento despues y las pruebas
-   acababan corriendo igual en produccion. Se marca una bandera y cada
-   script decide, ya con el DOM montado. */
+/* Ver la nota del blindaje en datos-demo.html: la bandera se marca aquí
+   y cada script decide después, con el DOM ya montado. */
 window.__enLocal = ['localhost', '127.0.0.1', ''].indexOf(location.hostname) >= 0;
 window.__avisaFuera = function () {
   document.addEventListener('DOMContentLoaded', function () {
-    document.body.setAttribute('style', 'font:15px/1.6 system-ui;padding:40px;max-width:32em;background:#fafffa;color:#121613');
+    document.body.setAttribute('style', 'font:15px/1.6 system-ui;padding:40px;max-width:32em;background:#f6f6f8;color:#1f1f1f');
     document.body.innerHTML =
       '<h1 style="font-size:20px;margin:0 0 12px">Página de pruebas</h1>' +
       '<p style="margin:0 0 12px">Solo funciona sirviendo el proyecto en local. ' +
       'Escribe y borra el almacén del navegador, así que aquí se queda parada a propósito.</p>' +
-      '<p style="margin:0"><a href="/" style="color:#17a832">Ir al CRM</a></p>';
+      '<p style="margin:0"><a href="/" style="color:#1f1f1f">Ir al CRM</a></p>';
   });
 };
 </script>
-<title>pruebas</title>
-<!-- Pruebas de humo. Fichero local, no se publica: se borra antes del commit.
-     Conduce la aplicacion real dentro de un iframe y comprueba el resultado
-     en el DOM y en localStorage. -->
+<title>pruebas de humo</title>
 <style>body{font:13px ui-monospace,monospace;padding:16px}
-b.ok{color:#0a7a24}b.no{color:#b00}#marco{width:1200px;height:800px;border:1px solid #ccc}</style>
+b.ok{color:#15803d}b.no{color:#be123c}
+h3{font:600 12px ui-monospace,monospace;margin:14px 0 4px;color:#666;text-transform:uppercase;letter-spacing:.06em}
+#marco{width:1280px;height:820px;border:1px solid #ccc}</style>
 <ul id="salida"></ul>
 <iframe id="marco"></iframe>
 <script>
-var out = document.getElementById('salida');
 if (!window.__enLocal) { window.__avisaFuera(); } else {
 
-var fallos = 0, total = 0;
+const out = document.getElementById('salida');
+let fallos = 0, total = 0;
+
 function comprueba(nombre, cond, detalle) {
   total++;
   if (!cond) fallos++;
-  var li = document.createElement('li');
-  li.innerHTML = '<b class="' + (cond ? 'ok' : 'no') + '">' + (cond ? 'PASA' : 'FALLA') + '</b> ' +
+  const li = document.createElement('li');
+  li.innerHTML = `<b class="${cond ? 'ok' : 'no'}">${cond ? 'PASA' : 'FALLA'}</b> ` +
                  nombre + (detalle && !cond ? ' — ' + detalle : '');
   out.appendChild(li);
 }
+function bloque(t) {
+  const h = document.createElement('h3');
+  h.textContent = t;
+  out.appendChild(h);
+}
+const duerme = ms => new Promise(r => setTimeout(r, ms));
 
-// Errores de JS dentro del iframe: se recogen antes de que cargue.
-var errores = [];
-window.addEventListener('error', function (e) { errores.push(String(e.message)); });
+/* PBKDF2 con 250.000 vueltas no es instantáneo: en vez de dormir a ojo
+   se espera a que la condición se cumpla, hasta un tope. */
+async function hasta(cond, ms = 6000) {
+  const fin = Date.now() + ms;
+  while (Date.now() < fin) {
+    try { if (cond()) return true; } catch (e) { /* aún no está el DOM */ }
+    await duerme(60);
+  }
+  return false;
+}
 
-localStorage.removeItem('orezco.crm.v1');
+const errores = [];
+window.addEventListener('error', e => errores.push(String(e.message)));
 
-var f = document.getElementById('marco');
+localStorage.removeItem('filnet.erp.v1');
+localStorage.removeItem('filnet.erp.acceso.v1');
+
+const CLAVE = 'pruebas-2026';
+const f = document.getElementById('marco');
 f.src = '/#panel';
-f.onload = function () {
-  var w = f.contentWindow, d = f.contentDocument;
-  w.addEventListener('error', function (e) { errores.push(String(e.message)); });
-  setTimeout(arranca, 400);
 
-  function $(s) { return d.querySelector(s); }
-  function $$(s) { return Array.prototype.slice.call(d.querySelectorAll(s)); }
-  function guardado() { try { return JSON.parse(w.localStorage.getItem('orezco.crm.v1')) || {}; } catch (e) { return {}; } }
-  function rellena(campo, valor) {
-    var el = $('#f_' + campo);
+f.onload = async function () {
+  let w = f.contentWindow, d = f.contentDocument;
+  w.addEventListener('error', e => errores.push(String(e.message)));
+
+  const $ = s => d.querySelector(s);
+  const $$ = s => Array.from(d.querySelectorAll(s));
+  const guardado = () => { try { return JSON.parse(w.localStorage.getItem('filnet.erp.v1')) || {}; } catch (e) { return {}; } };
+  const acceso = () => { try { return JSON.parse(w.localStorage.getItem('filnet.erp.acceso.v1')) || {}; } catch (e) { return {}; } };
+  const nav = v => $$('.mi').filter(b => b.dataset.vista === v)[0].click();
+
+  function rellena(sel, valor) {
+    const el = typeof sel === 'string' ? $(sel) : sel;
     if (!el) return false;
-    el.value = valor;
+    const proto = el.tagName === 'TEXTAREA' ? w.HTMLTextAreaElement.prototype
+                : el.tagName === 'SELECT' ? w.HTMLSelectElement.prototype : w.HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, valor);
     el.dispatchEvent(new w.Event('input', { bubbles: true }));
+    el.dispatchEvent(new w.Event('change', { bubbles: true }));
     return true;
   }
-  function envia() { $('#form').dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true })); }
+  const campo = (n, v) => rellena('#f_' + n, v);
+  const envia = (id = '#form') => $(id).dispatchEvent(new w.Event('submit', { bubbles: true, cancelable: true }));
 
-  function arranca() {
-    // 1. Arranca sin errores y con el estado vacio honesto
-    comprueba('Arranca sin errores de JavaScript', errores.length === 0, errores.join(' | '));
-    comprueba('Empieza vacio, sin datos de ejemplo',
-      /Aún no hay nada dentro/.test(d.body.textContent), 'no aparece el estado vacio');
+  await duerme(500);
 
-    // 2. El boton Nuevo abre el formulario
-    $('#btnNuevo').click();
-    comprueba('El boton Nuevo abre el formulario', !!$('#form') && $('#dlg').open);
+  // ══ La puerta: el registro está cerrado ═══════════════════════════
+  bloque('La puerta, sin registro');
+  comprueba('La puerta sale antes que la aplicación', !$('#acceso').hidden);
+  comprueba('Nada de la aplicación se pinta por detrás',
+    d.body.classList.contains('cerrado') && w.getComputedStyle($('#lateral')).display === 'none');
+  comprueba('Sin credenciales publicadas, no deja entrar a nadie',
+    /El acceso no está configurado/.test(d.body.textContent));
+  comprueba('Y NO ofrece darse de alta',
+    !$('#clave1') && !$('#clave2') && !/Primer acceso|Crear el acceso/.test(d.body.textContent),
+    'hay una pantalla de alta donde no debería');
+  comprueba('Lo dice sin rodeos',
+    /Nadie puede darse de alta desde esta pantalla/.test(d.body.textContent));
 
-    // 3. Un formulario vacio no crea nada
-    envia();
-    comprueba('Rechaza la empresa sin nombre',
-      $('#formError') && !$('#formError').hidden && (guardado().empresas || []).length === 0,
-      'deberia mostrar error y no guardar');
+  /* La puerta con credenciales publicadas se prueba en su banco, porque
+     equipo.js es un fichero estático que el navegador no puede escribir.
+     El banco calcula el hash al vuelo y lo publica igual que haría
+     equipo.js. */
+  const banco = document.createElement('iframe');
+  banco.style.cssText = 'width:1100px;height:600px;border:1px solid #ccc;display:block;margin-top:8px';
+  banco.src = '/pruebas/puerta.html';
+  document.body.appendChild(banco);
+  await hasta(() => banco.contentDocument &&
+    banco.contentDocument.querySelector('#estado') &&
+    banco.contentDocument.querySelector('#estado').textContent !== 'preparando…', 15000);
 
-    // 4. Valida el correo
-    rellena('nombre', 'Probadora SL');
-    rellena('email', 'esto-no-es-correo');
-    envia();
-    comprueba('Rechaza un correo mal escrito',
-      $('#formError') && /correo/.test($('#formError').textContent) && (guardado().empresas || []).length === 0);
+  const bd = banco.contentDocument, bw = banco.contentWindow;
+  const bpon = v => {
+    const el = bd.querySelector('#clave');
+    Object.getOwnPropertyDescriptor(bw.HTMLInputElement.prototype, 'value').set.call(el, v);
+    el.dispatchEvent(new bw.Event('input', { bubbles: true }));
+  };
+  const benvia = () => bd.querySelector('#accForm')
+    .dispatchEvent(new bw.Event('submit', { bubbles: true, cancelable: true }));
 
-    // 5. Crea la empresa
-    rellena('email', 'hola@probadora.example');
-    rellena('sector', 'Pruebas');
-    envia();
-    var g = guardado();
-    comprueba('Crea la empresa y la guarda', (g.empresas || []).length === 1 && g.empresas[0].nombre === 'Probadora SL');
-    comprueba('La empresa sale en la vista',
-      (function () { $$('.nav-i').filter(function (b) { return b.dataset.vista === 'empresas'; })[0].click();
-        return /Probadora SL/.test(d.body.textContent); })());
+  comprueba('Con credenciales publicadas pide usuario y contraseña',
+    !!bd.querySelector('#clave') && /Iniciar sesión/.test(bd.body.textContent));
+  comprueba('Solo aparece quien está publicado, no todo el equipo',
+    Array.from(bd.querySelectorAll('#usuario option')).map(o => o.value).join(',') === 'ana',
+    'opciones: ' + Array.from(bd.querySelectorAll('#usuario option')).map(o => o.value).join(','));
+  comprueba('Dice que no hay registro',
+    /No hay registro/.test(bd.body.textContent));
 
-    // 6. XSS: el nombre con etiquetas se muestra como texto, no se ejecuta
-    $('#btnNuevo').click();
-    rellena('nombre', '<img src=x onerror="window.__roto=1">Maliciosa');
-    envia();
-    var hayImg = $$('td img').length > 0;
-    comprueba('Un nombre con etiquetas no inyecta HTML', !hayImg && !w.__roto);
-    comprueba('Y se ve tal cual lo escribio el usuario',
-      d.body.textContent.indexOf('<img src=x') >= 0);
+  bpon('la-que-no-es');
+  benvia();
+  comprueba('Una contraseña incorrecta no entra',
+    await hasta(() => /incorrectos/.test(bd.body.textContent)) && !bd.querySelector('#acceso').hidden);
 
-    // 7. Oportunidad, valor y embudo
-    $$('.nav-i').filter(function (b) { return b.dataset.vista === 'embudo'; })[0].click();
-    $('#btnNuevo').click();
-    rellena('titulo', 'Venta de prueba');
-    rellena('valor', '1500');
-    rellena('etapa', 'propuesta');
-    envia();
-    var g2 = guardado();
-    comprueba('Crea la oportunidad con su valor',
-      (g2.oportunidades || []).length === 1 && g2.oportunidades[0].valor === 1500 && g2.oportunidades[0].etapa === 'propuesta');
-    comprueba('El total del embudo suma bien',
-      /1500\s*€/.test(d.body.textContent.replace(/ /g, ' ')), 'no encuentro 1500 € en el embudo');
+  bpon(bw.__CLAVE_PRUEBA);
+  benvia();
+  comprueba('La correcta entra', await hasta(() => bd.querySelector('#acceso').hidden, 8000));
+  comprueba('Queda sesión con caducidad', (() => {
+    const s = JSON.parse(bw.localStorage.getItem('filnet.erp.acceso.v1') || '{}');
+    return !!(s.sesion && s.sesion.id === 'ana' && s.sesion.hasta > Date.now());
+  })());
+  comprueba('La sesión NO guarda la contraseña',
+    (bw.localStorage.getItem('filnet.erp.acceso.v1') || '').indexOf(bw.__CLAVE_PRUEBA) < 0);
 
-    // 8. Rechaza un valor negativo
-    var tj = $('.tj'); tj.click();
-    $('[data-editar="oportunidad"]').click();
-    rellena('valor', '-40');
-    envia();
-    comprueba('Rechaza un valor negativo',
-      $('#formError') && !$('#formError').hidden && guardado().oportunidades[0].valor === 1500);
-    $('#cancelar').click();
+  bw.localStorage.removeItem('filnet.erp.acceso.v1');
+  banco.remove();
 
-    // 9. Cambiar de etapa desde la ficha
-    $('[data-mover][data-etapa="ganada"]').click();
-    var g3 = guardado();
-    comprueba('Mover a Ganada cambia la etapa y anota la fecha',
-      g3.oportunidades[0].etapa === 'ganada' && !!g3.oportunidades[0].cerrado);
-    comprueba('El cambio queda registrado en la actividad',
-      (g3.actividad || []).some(function (a) { return /Ganada/.test(a.texto); }));
+  /* El resto de la suite necesita estar DENTRO de la aplicación real.
+     Se recarga el iframe apuntando al banco, que es index.html tal cual
+     pero con una credencial de prueba publicada en lugar del equipo.js
+     vacío. Así se prueba la aplicación de verdad, no una copia. */
+  bloque('Dentro, entrando por la puerta');
+  /* Desenganchar onload ANTES de cambiar el src: si no, al navegar el
+     iframe se dispara otra vez y la suite entera se ejecuta dos veces. */
+  f.onload = null;
+  f.src = '/pruebas/app-con-acceso.html';
+  await hasta(() => f.contentDocument && f.contentDocument.querySelector('#clave'), 15000);
 
-    // 10. Tareas
-    $$('.nav-i').filter(function (b) { return b.dataset.vista === 'tareas'; })[0].click();
-    $('#btnNuevo').click();
-    rellena('titulo', 'Llamar el lunes');
-    envia();
-    comprueba('Crea la tarea', (guardado().tareas || []).length === 1);
-    var antes = $('.nav-n[data-cuenta="tareas"]').textContent;
-    $('[data-hecha]').click();
-    comprueba('Marcarla hecha baja el contador',
-      guardado().tareas[0].hecha === true && $('.nav-n[data-cuenta="tareas"]').textContent !== antes,
-      'antes=' + antes + ' ahora=' + $('.nav-n[data-cuenta="tareas"]').textContent);
+  const dd = () => f.contentDocument;
+  const ww = () => f.contentWindow;
+  comprueba('El banco pide contraseña, como en producción',
+    !!dd().querySelector('#clave') && /Iniciar sesión/.test(dd().body.textContent));
 
-    // 11. Buscador
-    var b = $('#buscar');
-    b.value = 'Probadora';
-    b.dispatchEvent(new w.Event('input', { bubbles: true }));
-    comprueba('El buscador encuentra la empresa',
-      !$('#resultados').hidden && /Probadora SL/.test($('#resultados').textContent));
+  (function () {
+    const el = dd().querySelector('#clave');
+    Object.getOwnPropertyDescriptor(ww().HTMLInputElement.prototype, 'value').set
+      .call(el, ww().__CLAVE_PRUEBA);
+    el.dispatchEvent(new (ww().Event)('input', { bubbles: true }));
+    dd().querySelector('#accForm')
+      .dispatchEvent(new (ww().Event)('submit', { bubbles: true, cancelable: true }));
+  })();
 
-    // 12. Ocultos de verdad (la colision de [hidden] con display:flex)
-    $('#buscar').value = '';
-    $('#buscar').dispatchEvent(new w.Event('input', { bubbles: true }));
-    comprueba('La ficha lateral esta realmente oculta',
-      w.getComputedStyle($('#cajon')).display === 'none');
-    comprueba('El aviso esta realmente oculto',
-      $('#aviso').hidden === false || w.getComputedStyle($('#aviso')).display !== 'block');
+  comprueba('Entra con la contraseña correcta',
+    await hasta(() => dd().querySelector('#acceso').hidden, 10000));
 
-    // 13. Las direcciones por ancla funcionan
-    w.location.hash = 'ajustes';
-    setTimeout(function () {
-      comprueba('El ancla cambia de vista', /Dónde están tus datos/.test(d.body.textContent));
-      comprueba('Sigue sin errores de JavaScript al final', errores.length === 0, errores.join(' | '));
-      document.title = fallos === 0 ? 'TODO OK ' + total + '/' + total : 'FALLOS ' + fallos + '/' + total;
-      var res = document.createElement('p');
-      res.id = 'resumen';
-      res.textContent = 'RESULTADO: ' + (total - fallos) + '/' + total + ' pasan, ' + fallos + ' fallan';
-      out.parentNode.insertBefore(res, out);
-    }, 300);
-  }
+  // ══ La aplicación ══════════════════════════════════════════════════
+  /* El iframe se ha recargado, así que hay que volver a coger documento y
+     ventana: los de antes apuntan a un documento que ya no existe. */
+  w = f.contentWindow; d = f.contentDocument;
+
+  bloque('Clientes');
+  comprueba('Quien entró es quien firma el trabajo',
+    await hasta(() => guardado().yo === 'carlos', 3000));
+  comprueba('Arranca sin errores de JavaScript', errores.length === 0, errores.join(' | '));
+  comprueba('Empieza vacío, sin datos de ejemplo', /Aún no hay nada dentro/.test(d.body.textContent));
+
+  $('[data-nuevo="cliente"]').click();
+  comprueba('El botón abre el formulario', !!$('#form') && $('#dlg').open);
+  envia();
+  comprueba('Rechaza el cliente sin nombre',
+    $('#formError') && !$('#formError').hidden && (guardado().clientes || []).length === 0);
+
+  campo('nombre', 'Probadora SL');
+  campo('email', 'esto-no-es-correo');
+  envia();
+  comprueba('Rechaza un correo mal escrito',
+    /correo/.test($('#formError').textContent) && (guardado().clientes || []).length === 0);
+
+  campo('email', 'hola@probadora.example');
+  campo('pais', 'pt');
+  campo('estado', 'cont');
+  envia();
+  let g = guardado();
+  comprueba('Crea el cliente y lo guarda',
+    (g.clientes || []).length === 1 && g.clientes[0].nombre === 'Probadora SL' && g.clientes[0].pais === 'pt');
+
+  nav('clientes');
+  comprueba('El cliente sale en la tabla', /Probadora SL/.test(d.body.textContent));
+  comprueba('El país sale como código, no como emoji',
+    $$('.cod').some(e => e.textContent.trim() === 'PT'));
+  comprueba('La tabla tiene columna Asignado',
+    $$('th').some(h => /Asignado/.test(h.textContent)));
+  comprueba('Hay filtro de "Míos"',
+    $$('[data-filtro="clientes"]').some(b => /Míos/.test(b.textContent)));
+  comprueba('El cliente queda asignado a quien lo creó', guardado().clientes[0].asignado === 'carlos');
+
+  $('[data-nuevo="cliente"]').click();
+  campo('nombre', '<img src=x onerror="window.__roto=1">Maliciosa');
+  envia();
+  comprueba('Un nombre con etiquetas no inyecta HTML', $$('td img').length === 0 && !w.__roto);
+  comprueba('Y se ve tal cual lo escribió quien lo puso', d.body.textContent.includes('<img src=x'));
+
+  bloque('Expedientes y países');
+  nav('expedientes');
+  $('[data-nuevo="expediente"]').click();
+  envia();
+  comprueba('El expediente exige cliente', !$('#formError').hidden && (guardado().expedientes || []).length === 0);
+  campo('clienteId', guardado().clientes[0].id);
+  campo('pais', 'ad');
+  campo('importe', '-40');
+  envia();
+  comprueba('Rechaza un importe negativo', !$('#formError').hidden && (guardado().expedientes || []).length === 0);
+  campo('importe', '2400');
+  envia();
+  g = guardado();
+  comprueba('Crea el expediente con su importe',
+    (g.expedientes || []).length === 1 && g.expedientes[0].importe === 2400 && g.expedientes[0].fase === 'doc');
+
+  $('tbody tr').click();
+  comprueba('La fila abre la ficha', !$('#cajon').hidden);
+  $('[data-fase][data-valor="const"]').click();
+  g = guardado();
+  comprueba('Mover a Constituida cierra el expediente',
+    g.expedientes[0].fase === 'const' && !!g.expedientes[0].cerrado);
+  comprueba('El cambio queda en la actividad, con su autor',
+    (g.actividad || []).some(a => /Constituida/.test(a.texto) && a.quien === 'carlos'));
+
+  nav('paises');
+  comprueba('Los precios empiezan vacíos',
+    /Sin precio/.test(d.body.textContent) && Object.keys(guardado().precios || {}).length === 0);
+
+  bloque('Equipo, tareas y resto');
+  nav('tareas');
+  $('[data-nuevo="tarea"]').click();
+  campo('titulo', 'Pedir el pasaporte');
+  envia();
+  comprueba('Crea la tarea', (guardado().tareas || []).length === 1);
+  const antes = $('.mi-n[data-cuenta="tareas"]').textContent;
+  $('[data-hecha]').click();
+  comprueba('Marcarla hecha baja el contador',
+    guardado().tareas[0].hecha === true && $('.mi-n[data-cuenta="tareas"]').textContent !== antes);
+
+  nav('calendario');
+  comprueba('El calendario pinta el mes', $$('.cal-c').length >= 28);
+
+  nav('llamadas');
+  $('[data-nuevo="llamada"]').click();
+  campo('clienteId', guardado().clientes[0].id);
+  envia();
+  comprueba('La llamada exige el resumen', !$('#formError').hidden && (guardado().llamadas || []).length === 0);
+  campo('resumen', 'Queda en mandar el pasaporte');
+  envia();
+  comprueba('Anota la llamada', (guardado().llamadas || []).length === 1);
+
+  comprueba('El equipo trae los cinco nombres',
+    (guardado().equipo || []).map(p => p.id).join(',') === 'carlos,syed,victor,ramon,arnau');
+  comprueba('Solo tiene acceso quien está publicado', w.Acceso.cuantos() === 1);
+  comprueba('Hay una persona activa y se ve abajo',
+    !!guardado().yo && $('#yoNom').textContent.length > 0);
+
+  nav('ajustes');
+  comprueba('Ajustes dice que el registro está cerrado',
+    /El registro está cerrado/.test(d.body.textContent));
+  comprueba('Y que es una puerta, no una caja fuerte',
+    /es una puerta, no una caja fuerte/.test(d.body.textContent));
+  comprueba('Y que la comprobación pasa en el navegador',
+    /se comprueba en el navegador, no en un servidor/.test(d.body.textContent));
+  comprueba('Ajustes NO ofrece dar de alta a nadie',
+    !/Añadir persona/.test(d.body.textContent) && !d.querySelector('[data-quita-persona]'),
+    'hay botones de alta o baja donde no debería');
+
+  // ══ Las secciones que faltaban ═════════════════════════════════════
+  bloque('Facturación, documentos y objetivos');
+
+  nav('facturacion');
+  $('[data-nuevo="factura"]').click();
+  envia();
+  comprueba('La factura exige cliente y base',
+    !$('#formError').hidden && (guardado().facturas || []).length === 0);
+  campo('clienteId', guardado().clientes[0].id);
+  campo('base', '1000');
+  campo('iva', '210');
+  envia();
+  let gf = guardado();
+  comprueba('Crea la factura', (gf.facturas || []).length === 1 && gf.facturas[0].base === 1000);
+  comprueba('El total suma base más IVA', /1\.?210/.test(d.body.textContent));
+
+  $('tbody tr').click();
+  $('[data-cobro][data-valor="cobrada"]').click();
+  gf = guardado();
+  comprueba('Marcar cobrada anota la fecha',
+    gf.facturas[0].estado === 'cobrada' && !!gf.facturas[0].cobrada);
+
+  nav('documentos');
+  $('[data-nuevo="documento"]').click();
+  envia();
+  comprueba('El documento exige expediente',
+    !$('#formError').hidden && (guardado().documentos || []).length === 0);
+  campo('expedienteId', guardado().expedientes[0].id);
+  campo('tipo', 'pasaporte');
+  envia();
+  comprueba('Pide el documento', (guardado().documentos || []).length === 1);
+  $('[data-valida]').click();
+  comprueba('Validar lo marca y anota la recepción',
+    guardado().documentos[0].estado === 'validado' && !!guardado().documentos[0].recibido);
+
+  nav('objetivos');
+  $('[data-nuevo="objetivo"]').click();
+  campo('meta', '0');
+  envia();
+  comprueba('El objetivo no admite cero',
+    !$('#formError').hidden && (guardado().objetivos || []).length === 0);
+  campo('meta', '3');
+  campo('personaId', 'carlos');
+  envia();
+  comprueba('Pone el objetivo', (guardado().objetivos || []).length === 1);
+  comprueba('Lo logrado sale de los datos, no se teclea',
+    /1 de 3|33%/.test(d.body.textContent),
+    'el expediente constituido de antes debería contar');
+
+  $('[data-nuevo="objetivo"]').click();
+  campo('meta', '5');
+  campo('personaId', 'carlos');
+  envia();
+  comprueba('No deja duplicar el objetivo del mismo mes',
+    !$('#formError').hidden && guardado().objetivos.length === 1);
+  $('#cancelar').click();
+
+  nav('canales');
+  comprueba('Canales reparte por el origen del cliente',
+    /Canal/.test(d.body.textContent) && $$('tbody tr').length >= 1);
+
+  nav('usuarios');
+  comprueba('Usuarios lista al equipo entero', $$('tbody tr').length === 5);
+  comprueba('Y dice quién tiene acceso',
+    /con acceso/.test(d.body.textContent) && /sin acceso/.test(d.body.textContent));
+  comprueba('Y que el registro está cerrado',
+    /El registro está cerrado/.test(d.body.textContent));
+
+  bloque('Cascada y anclas');
+  nav('panel');
+  /* Se pone hidden a mano en vez de esperar al temporizador: lo que se
+     comprueba es la cascada ([hidden] contra display:flex). */
+  $('#cajon').hidden = true;
+  $('#aviso').hidden = true;
+  comprueba('La ficha lateral, oculta, no se pinta', w.getComputedStyle($('#cajon')).display === 'none');
+  comprueba('El aviso, oculto, no se pinta', w.getComputedStyle($('#aviso')).display === 'none');
+
+  w.location.hash = 'ajustes';
+  await duerme(320);
+  comprueba('El ancla cambia de vista', /Dónde están tus datos/.test(d.body.textContent));
+  comprueba('Sigue sin errores de JavaScript al final', errores.length === 0, errores.join(' | '));
+
+  // ══ Resumen ════════════════════════════════════════════════════════
+  document.title = fallos === 0 ? 'TODO OK ' + total : 'FALLOS ' + fallos;
+  const res = document.createElement('p');
+  res.id = 'resumen';
+  res.textContent = 'RESULTADO: ' + (total - fallos) + '/' + total + ' pasan, ' + fallos + ' fallan';
+  out.parentNode.insertBefore(res, out);
 };
 
 }

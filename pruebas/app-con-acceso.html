@@ -1,0 +1,50 @@
+<!doctype html><meta charset="utf-8">
+<script>
+window.__enLocal = ['localhost', '127.0.0.1', ''].indexOf(location.hostname) >= 0;
+if (!window.__enLocal) {
+  document.addEventListener('DOMContentLoaded', function () {
+    document.body.setAttribute('style', 'font:15px/1.6 system-ui;padding:40px;max-width:32em');
+    document.body.innerHTML = '<h1 style="font-size:20px">Banco de pruebas</h1>' +
+      '<p>Solo funciona en local.</p><p><a href="/">Ir al CRM</a></p>';
+  });
+}
+</script>
+<title>CRM con acceso de prueba</title>
+<script>
+/* Banco de pruebas: la aplicación REAL, pero con una credencial de
+ * prueba publicada.
+ *
+ * En producción las credenciales vienen de assets/equipo.js, un fichero
+ * estático que el navegador no puede escribir. Aquí se calcula una al
+ * vuelo y se inyecta en el mismo global, sustituyendo la etiqueta que
+ * carga equipo.js. Todo lo demás —index.html, app.js, acceso.js— es
+ * exactamente el de producción, sin copiar ni una línea.
+ *
+ * La contraseña de prueba está a la vista porque es de mentira.
+ */
+if (window.__enLocal) (async function () {
+  const CLAVE = 'contrasena-de-prueba-larga';
+  const hex = b => Array.from(new Uint8Array(b)).map(x => ('0' + x.toString(16)).slice(-2)).join('');
+
+  const sal = crypto.getRandomValues(new Uint8Array(16));
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(CLAVE), 'PBKDF2', false, ['deriveBits']);
+  const hash = hex(await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt: sal, iterations: 250000, hash: 'SHA-256' }, k, 256));
+
+  let html = await (await fetch('/index.html')).text();
+
+  /* Esta página vive en /pruebas/, así que las rutas relativas del index
+     hay que anclarlas a la raíz. */
+  html = html.replace(/(src|href)="assets\//g, '$1="/assets/');
+
+  /* Fuera el equipo.js vacío; entra la credencial de prueba. */
+  html = html.replace(/<script src="\/assets\/equipo\.js[^"]*"><\/script>/,
+    '<script>window.FILNET_ACCESOS = ' +
+    JSON.stringify({ carlos: { sal: hex(sal.buffer), hash: hash } }) +
+    '; window.__CLAVE_PRUEBA = ' + JSON.stringify(CLAVE) + ';<\/script>');
+
+  document.open();
+  document.write(html);
+  document.close();
+})();
+</script>

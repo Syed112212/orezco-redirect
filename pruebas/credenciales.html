@@ -1,0 +1,176 @@
+<!doctype html><meta charset="utf-8">
+<script>
+/* Solo en local. Esta página genera credenciales; servida por internet
+   no tiene ningún sentido y sí bastante riesgo. La bandera se marca aquí
+   y se decide con el DOM montado (reemplazar documentElement desde el
+   head no detiene al parser). */
+window.__enLocal = ['localhost', '127.0.0.1', ''].indexOf(location.hostname) >= 0;
+if (!window.__enLocal) {
+  document.addEventListener('DOMContentLoaded', function () {
+    document.body.setAttribute('style', 'font:15px/1.6 system-ui;padding:40px;max-width:34em;background:#f6f6f8;color:#1f1f1f');
+    document.body.innerHTML =
+      '<h1 style="font-size:20px;margin:0 0 12px">Generador de accesos</h1>' +
+      '<p style="margin:0 0 12px">Solo funciona sirviendo el proyecto en local. ' +
+      'Aquí se queda parado a propósito.</p>' +
+      '<p style="margin:0"><a href="/" style="color:#1f1f1f">Ir al CRM</a></p>';
+  });
+}
+</script>
+<title>Generar accesos — Filnet CRM</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root{--tinta:#1f1f1f;--pizarra:#717173;--tenue:#9aa3ad;--linea:#e9e9ee;--bruma:#f7f7f7;--lienzo:#f6f6f8;--ro:#be123c;--ve:#15803d}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--lienzo);color:var(--tinta);font:400 15px/1.55 Inter,system-ui,sans-serif;padding:32px 20px}
+  main{max-width:620px;margin:0 auto;background:#fff;border-radius:18px;padding:30px 32px;box-shadow:0 1px 2px rgba(31,31,31,.05)}
+  h1{font-size:26px;font-weight:700;letter-spacing:-.03em;margin:0 0 6px}
+  .sub{color:var(--pizarra);font-size:14px;margin:0 0 22px}
+  .nota{background:var(--bruma);border:1px solid var(--linea);border-radius:12px;padding:14px 16px;font-size:13.5px;line-height:1.6;color:var(--pizarra);margin-bottom:22px}
+  .nota b{color:var(--tinta)}
+  .p{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--linea)}
+  .p:last-of-type{border-bottom:0}
+  .p label{width:88px;font-weight:600;font-size:14px;flex:none}
+  .p input{flex:1;min-width:0;padding:9px 11px;border:1px solid var(--linea);border-radius:8px;background:var(--bruma);font:inherit;font-size:14px}
+  .p input:focus{outline:none;background:#fff;border-color:var(--tinta)}
+  .p .est{font-size:12px;color:var(--tenue);width:104px;text-align:right;flex:none}
+  .est.ok{color:var(--ve)}.est.mal{color:var(--ro)}
+  .acc{display:flex;gap:8px;margin-top:22px;flex-wrap:wrap}
+  button{font:inherit;font-size:14px;font-weight:500;padding:10px 16px;border:0;border-radius:10px;cursor:pointer}
+  .b1{background:var(--tinta);color:#fff}
+  .b1:disabled{opacity:.45;cursor:default}
+  .b2{background:#ededf1;color:var(--tinta)}
+  pre{background:#1f1f1f;color:#eee;border-radius:12px;padding:16px;overflow:auto;font-size:12px;line-height:1.5;margin-top:22px;max-height:280px}
+  .aviso{font-size:13px;color:var(--ro);margin-top:14px}
+</style>
+<main>
+  <h1>Generar accesos</h1>
+  <p class="sub">Pon una contraseña por persona. Se descarga <code>equipo.js</code> para sustituir el del proyecto.</p>
+
+  <div class="nota">
+    <b>Lo que se descarga no contiene ninguna contraseña</b>, solo su PBKDF2-SHA256 con
+    250.000 vueltas y una sal propia. Aun así ese fichero <b>viaja con la página</b>: quien la
+    descargue puede intentar adivinarlas sin límite y sin que nadie lo vea.
+    <b>Usa contraseñas largas</b> — cuatro palabras sueltas van mejor que ocho caracteres raros —
+    y no las reutilices en ningún otro sitio.
+    Deja en blanco a quien no deba entrar: <b>si no está en el fichero, no entra</b>.
+  </div>
+
+  <div id="gente"></div>
+
+  <div class="acc">
+    <button class="b1" id="generar">Generar y descargar</button>
+    <button class="b2" id="ver">Ver el fichero</button>
+  </div>
+  <p class="aviso" id="aviso"></p>
+  <pre id="salida" hidden></pre>
+</main>
+
+<script>
+if (window.__enLocal) {
+
+const EQUIPO = [
+  { id: 'carlos', n: 'Carlos' },
+  { id: 'syed',   n: 'Syed' },
+  { id: 'victor', n: 'Víctor' },
+  { id: 'ramon',  n: 'Ramón' },
+  { id: 'arnau',  n: 'Arnau' }
+];
+const VUELTAS = 250000;
+
+const gente = document.getElementById('gente');
+gente.innerHTML = EQUIPO.map(p => `
+  <div class="p">
+    <label for="c_${p.id}">${p.n}</label>
+    <input id="c_${p.id}" type="text" autocomplete="off" spellcheck="false"
+           placeholder="contraseña (o vacío para no dar acceso)">
+    <span class="est" id="e_${p.id}">sin acceso</span>
+  </div>`).join('');
+
+function fuerza(v) {
+  if (!v) return ['sin acceso', ''];
+  if (v.length < 10) return ['muy corta', 'mal'];
+  if (v.length < 16) return ['aceptable', ''];
+  return ['buena', 'ok'];
+}
+EQUIPO.forEach(p => {
+  const i = document.getElementById('c_' + p.id), e = document.getElementById('e_' + p.id);
+  i.addEventListener('input', () => {
+    const [t, c] = fuerza(i.value.trim());
+    e.textContent = t;
+    e.className = 'est ' + c;
+  });
+});
+
+const hex = b => Array.from(new Uint8Array(b)).map(x => ('0' + x.toString(16)).slice(-2)).join('');
+
+async function deriva(clave, salBytes) {
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(clave), 'PBKDF2', false, ['deriveBits']);
+  return hex(await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt: salBytes, iterations: VUELTAS, hash: 'SHA-256' }, k, 256));
+}
+
+async function construye() {
+  const filas = [];
+  for (const p of EQUIPO) {
+    const v = document.getElementById('c_' + p.id).value.trim();
+    if (!v) continue;
+    if (v.length < 10) throw new Error(`La contraseña de ${p.n} es demasiado corta (mínimo 10).`);
+    const sal = crypto.getRandomValues(new Uint8Array(16));
+    const h = await deriva(v, sal);
+    filas.push(`  ${p.id}: { sal: '${hex(sal.buffer)}',\n    hash: '${h}' }`);
+  }
+  if (!filas.length) throw new Error('No has puesto ninguna contraseña: nadie podría entrar.');
+
+  return `/* == Filnet CRM - quien puede entrar ============================
+   Lista cerrada de accesos, generada el ${new Date().toISOString().slice(0, 10)}.
+   Quien no este aqui no entra, y la aplicacion no tiene ninguna pantalla
+   para darse de alta: anadir a alguien exige regenerar este fichero con
+   pruebas/credenciales.html y publicarlo.
+
+   No hay ninguna contrasena guardada: por persona hay una sal aleatoria
+   y PBKDF2-SHA256 con ${VUELTAS.toLocaleString('es-ES')} vueltas. De ahi no se saca la
+   contrasena de vuelta.
+
+   Este fichero viaja con la pagina, asi que quien la descargue puede
+   intentar adivinar las contrasenas sin limite. Por eso son largas. Si
+   el CRM tiene que estar de verdad cerrado, la respuesta es un servidor
+   con autenticacion, no este fichero.
+   =============================================================== */
+window.FILNET_ACCESOS = {
+${filas.join(',\n')}
+};
+`;
+}
+
+const aviso = document.getElementById('aviso');
+const salida = document.getElementById('salida');
+
+async function conBoton(fn) {
+  const b = document.getElementById('generar');
+  aviso.textContent = '';
+  b.disabled = true;
+  const antes = b.textContent;
+  b.textContent = 'Calculando…';
+  try { await fn(); }
+  catch (e) { aviso.textContent = e.message; }
+  finally { b.disabled = false; b.textContent = antes; }
+}
+
+document.getElementById('generar').onclick = () => conBoton(async () => {
+  const txt = await construye();
+  const u = URL.createObjectURL(new Blob([txt], { type: 'application/javascript;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = u; a.download = 'equipo.js';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(u), 1500);
+  salida.hidden = false;
+  salida.textContent = txt;
+});
+
+document.getElementById('ver').onclick = () => conBoton(async () => {
+  salida.hidden = false;
+  salida.textContent = await construye();
+});
+
+}
+</script>

@@ -1,36 +1,31 @@
 <!doctype html><meta charset="utf-8">
 <script>
-/* Estas paginas escriben y borran el almacen del navegador. Fuera de local
-   no deben ejecutarse nunca. Ojo: NO vale reemplazar documentElement aqui
-   -- el parser sigue anadiendo el resto del documento despues y las pruebas
-   acababan corriendo igual en produccion. Se marca una bandera y cada
-   script decide, ya con el DOM montado. */
+/* Chrome headless en Windows no rinde por debajo de ~500px de ancho: una
+   captura pedida a 390px es un recorte de un render de 500 y aparenta
+   desbordes que no existen. Por eso el móvil se mira en un iframe del
+   ancho exacto. */
 window.__enLocal = ['localhost', '127.0.0.1', ''].indexOf(location.hostname) >= 0;
 window.__avisaFuera = function () {
   document.addEventListener('DOMContentLoaded', function () {
-    document.body.setAttribute('style', 'font:15px/1.6 system-ui;padding:40px;max-width:32em;background:#fafffa;color:#121613');
+    document.body.setAttribute('style', 'font:15px/1.6 system-ui;padding:40px;max-width:32em;background:#f6f6f8;color:#1f1f1f');
     document.body.innerHTML =
       '<h1 style="font-size:20px;margin:0 0 12px">Página de pruebas</h1>' +
-      '<p style="margin:0 0 12px">Solo funciona sirviendo el proyecto en local. ' +
-      'Escribe y borra el almacén del navegador, así que aquí se queda parada a propósito.</p>' +
-      '<p style="margin:0"><a href="/" style="color:#17a832">Ir al CRM</a></p>';
+      '<p style="margin:0 0 12px">Solo funciona sirviendo el proyecto en local.</p>' +
+      '<p style="margin:0"><a href="/" style="color:#1f1f1f">Ir al CRM</a></p>';
   });
 };
+if (!window.__enLocal) window.__avisaFuera();
 </script>
-<script>if (!window.__enLocal) window.__avisaFuera();</script>
-<title>marco movil</title>
-<!-- Fichero de prueba local. No se publica: se borra antes del commit.
-     Chrome headless en Windows no rinde por debajo de ~500px de ancho,
-     asi que el viewport real se simula con un iframe del ancho exacto. -->
+<title>marco móvil</title>
 <style>
   body{margin:0;background:#555;display:flex;gap:20px;padding:20px;font:12px system-ui;color:#fff}
   figure{margin:0}
   figcaption{margin-bottom:6px}
   iframe{border:0;background:#fff;display:block}
 </style>
-<figure><figcaption>390 x 760 (iPhone)</figcaption>
-  <iframe src="/#panel" width="390" height="760"></iframe></figure>
-<figure><figcaption>390 x 760 (embudo)</figcaption>
-  <iframe src="/#embudo" width="390" height="760"></iframe></figure>
-<figure><figcaption>320 x 760 (el mas estrecho)</figcaption>
-  <iframe src="/#empresas" width="320" height="760"></iframe></figure>
+<figure><figcaption>390 × 780 — panel</figcaption>
+  <iframe src="/#panel" width="390" height="780"></iframe></figure>
+<figure><figcaption>390 × 780 — clientes</figcaption>
+  <iframe src="/#clientes" width="390" height="780"></iframe></figure>
+<figure><figcaption>320 × 780 — el más estrecho</figcaption>
+  <iframe src="/#paises" width="320" height="780"></iframe></figure>
