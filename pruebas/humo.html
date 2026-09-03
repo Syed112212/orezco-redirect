@@ -1,19 +1,21 @@
 <!doctype html><meta charset="utf-8">
 <script>
-/* Estas paginas escriben y borran el almacen del navegador. Fuera de
-   local no deben ejecutarse nunca: alguien que llegara por un enlace
-   perderia sus datos sin tocar nada. */
-(function () {
-  var h = location.hostname;
-  if (h === 'localhost' || h === '127.0.0.1' || h === '') return;
-  document.documentElement.innerHTML =
-    '<body style="font:15px system-ui;padding:40px;max-width:32em">' +
-    '<h1 style="font-size:20px">Pagina de pruebas</h1>' +
-    '<p>Solo funciona sirviendo el proyecto en local. Escribe en el almacen ' +
-    'del navegador, asi que aqui se queda parada a proposito.</p>' +
-    '<p><a href="/">Ir al CRM</a></p></body>';
-  throw new Error('pagina de pruebas fuera de local');
-})();
+/* Estas paginas escriben y borran el almacen del navegador. Fuera de local
+   no deben ejecutarse nunca. Ojo: NO vale reemplazar documentElement aqui
+   -- el parser sigue anadiendo el resto del documento despues y las pruebas
+   acababan corriendo igual en produccion. Se marca una bandera y cada
+   script decide, ya con el DOM montado. */
+window.__enLocal = ['localhost', '127.0.0.1', ''].indexOf(location.hostname) >= 0;
+window.__avisaFuera = function () {
+  document.addEventListener('DOMContentLoaded', function () {
+    document.body.setAttribute('style', 'font:15px/1.6 system-ui;padding:40px;max-width:32em;background:#fafffa;color:#121613');
+    document.body.innerHTML =
+      '<h1 style="font-size:20px;margin:0 0 12px">Página de pruebas</h1>' +
+      '<p style="margin:0 0 12px">Solo funciona sirviendo el proyecto en local. ' +
+      'Escribe y borra el almacén del navegador, así que aquí se queda parada a propósito.</p>' +
+      '<p style="margin:0"><a href="/" style="color:#17a832">Ir al CRM</a></p>';
+  });
+};
 </script>
 <title>pruebas</title>
 <!-- Pruebas de humo. Fichero local, no se publica: se borra antes del commit.
@@ -22,9 +24,11 @@
 <style>body{font:13px ui-monospace,monospace;padding:16px}
 b.ok{color:#0a7a24}b.no{color:#b00}#marco{width:1200px;height:800px;border:1px solid #ccc}</style>
 <ul id="salida"></ul>
-<iframe id="marco" src="/#panel"></iframe>
+<iframe id="marco"></iframe>
 <script>
 var out = document.getElementById('salida');
+if (!window.__enLocal) { window.__avisaFuera(); } else {
+
 var fallos = 0, total = 0;
 function comprueba(nombre, cond, detalle) {
   total++;
@@ -42,6 +46,7 @@ window.addEventListener('error', function (e) { errores.push(String(e.message));
 localStorage.removeItem('orezco.crm.v1');
 
 var f = document.getElementById('marco');
+f.src = '/#panel';
 f.onload = function () {
   var w = f.contentWindow, d = f.contentDocument;
   w.addEventListener('error', function (e) { errores.push(String(e.message)); });
@@ -171,4 +176,6 @@ f.onload = function () {
     }, 300);
   }
 };
+
+}
 </script>
